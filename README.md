@@ -37,6 +37,8 @@ Real result: a "friendlier" candidate prompt **regressed** groundedness from 0.7
 
 The judge's agreement with a labelled set of 96 claims was measured rather than assumed. On held-out real answers it scored κ = 0.34 (vs 0.62 overall and 0.78 held-out for the lexical heuristic), and these labels are still unreviewed drafts. Details, benchmarks (1.5B: ~80 tok/s, 1.48 GB peak; 3B judge: 2.54 GB peak) and limitations are in [docs/rag-evaluation.md](docs/rag-evaluation.md).
 
+Review the labels in a spreadsheet with `make labels-export` → edit in Excel or Google Sheets → `make labels-import REVIEWER="Your Name"`. Only rows you mark *Reviewed* are applied (see [docs/rag-evaluation.md](docs/rag-evaluation.md#reviewing-the-labels-in-excel-or-google-sheets)).
+
 ```bash
 make rag-demo        # replays the recorded model answers and judge verdicts; no model needed
 make setup-local-ai  # optional: install MLX (~400 MB) to regenerate with local models

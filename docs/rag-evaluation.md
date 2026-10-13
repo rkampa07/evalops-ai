@@ -83,16 +83,54 @@ of the default policy.
 Labels: 57 supported, 34 unsupported, 5 `not_a_claim` (non-factual sentences the claim splitter
 kept, such as "I'm sorry to hear…"; excluded from the metrics below and reported separately).
 
-> **Status: DRAFT labels.** All 96 labels were drafted by the developer and have **not** been
-> independently reviewed (`label_status: "draft"`, `reviewed_by: null`). The generated-claim labels
-> were written after seeing the heuristic's verdicts on those claims, which risks anchoring in the
-> heuristic's favour. Treat the numbers below as provisional until the set is reviewed:
->
->     backend/.venv/bin/python backend/scripts/review_labels.py --reviewer "<name>"
->     backend/.venv/bin/python backend/scripts/rag_judge.py calibrate --out examples/rag/calibration/<file>.json
->
-> Calibration reports record `label_status_counts` and `labels_are_reviewed`, so a reviewed result
-> can't be confused with this one.
+> **Status: DRAFT labels at the time of measurement.** The results below were computed when all
+> 96 labels were developer drafts (`label_status: "draft"`). The generated-claim labels were
+> written after seeing the heuristic's verdicts on those claims, which risks anchoring in the
+> heuristic's favour. Independent review is in progress; `claims.jsonl` is the source of truth for
+> which items are reviewed. Treat the numbers as provisional until review is complete and
+> calibration is re-run with `--reviewed-only`. Calibration reports record `label_status_counts`
+> and `labels_are_reviewed`, so a reviewed result can't be confused with this one.
+
+### Reviewing the labels in Excel or Google Sheets
+
+1. **Export** (refuses to overwrite an existing review file, so your edits are never lost):
+
+       make labels-export        # -> examples/rag/labels/claims_review.csv
+
+   Columns: Claim ID · Source Passage · AI Claim · Draft Label · **My Label** · Notes · **Review Status**.
+   *My Label* is pre-filled with the draft label, and every row you haven't reviewed is
+   **Unreviewed**. Rows you already reviewed (e.g. with `review_labels.py`) show as Reviewed.
+
+2. **Review** in a spreadsheet:
+   - *Google Sheets*: File → Import → Upload → "Replace spreadsheet". When done: File → Download →
+     Comma-separated values (.csv).
+   - *Excel*: open the file directly. When done: File → Save As → **CSV UTF-8 (Comma delimited)**.
+   - For each row you have actually checked against the *Source Passage*: set *My Label* to
+     `supported`, `unsupported` or `not_a_claim` (judge only against the passages shown), and set
+     *Review Status* to `Reviewed`. Optional: explain disagreements in *Notes*.
+   - Leave rows you haven't checked as `Unreviewed`. They are never imported, even if their label
+     was edited. Don't edit *Claim ID* or *AI Claim*.
+   - Tip: add a filter on *Review Status*, and a dropdown (data validation) on *My Label*.
+
+3. **Import**, dry run first:
+
+       make labels-import REVIEWER="Your Name" DRY=1
+       make labels-import REVIEWER="Your Name"
+       # a file saved elsewhere: make labels-import REVIEWER="Your Name" CSV=~/Downloads/claims_review.csv
+
+   Only `Reviewed` rows are applied; each stores your label, the original `draft_label`, the reviewer
+   and a timestamp. Earlier reviews are kept, and changing one needs
+   `backend/scripts/labels_csv.py import --allow-relabel`. Any invalid row (unknown label or status,
+   edited claim text, duplicate or unknown id, non-UTF-8 file) aborts the whole import and writes
+   nothing. Excel files saved with `;` separators are accepted.
+
+4. **Re-measure** on reviewed labels only:
+
+       backend/.venv/bin/python backend/scripts/rag_judge.py calibrate --reviewed-only \
+           --out examples/rag/calibration/llama3.2-3b_judge-v2_reviewed.json
+
+The terminal alternative, `backend/scripts/review_labels.py --reviewer "<name>"`, writes the same
+fields.
 
 **Protocol.** Positive class = *unsupported* (catching fabrication is the goal). `judge-v1` was the
 first prompt. `judge-v2` was written after `judge-v1` failed, using **only the 40 constructed items**

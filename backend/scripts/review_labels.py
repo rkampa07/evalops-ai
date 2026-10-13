@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,10 +45,12 @@ def main() -> None:
             break
         if answer == "k":
             continue
+        item.setdefault("draft_label", item["label"])
         if answer in CHOICES:
             item["label"] = CHOICES[answer]
         item["label_status"] = "reviewed"
         item["reviewed_by"] = args.reviewer
+        item["reviewed_at"] = datetime.now(UTC).isoformat(timespec="seconds")
         save()
     save()
     done = sum(i["label_status"] == "reviewed" for i in items)

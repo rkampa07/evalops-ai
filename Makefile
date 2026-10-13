@@ -4,7 +4,7 @@ PIP     := backend/.venv/bin/pip
 API_URL ?= http://127.0.0.1:8000
 
 .PHONY: setup setup-local-ai backend frontend seed migrate test test-backend test-frontend lint check clean-db \
-	rag-demo rag-demo-live rag-generate rag-calibrate
+	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import
 
 GEN_MODEL   ?= mlx-community/Qwen2.5-1.5B-Instruct-4bit
 JUDGE_MODEL ?= mlx-community/Llama-3.2-3B-Instruct-4bit
@@ -65,3 +65,10 @@ rag-generate:     ## Regenerate answers for both prompts with the local model, o
 rag-calibrate:    ## Measure heuristic + judge agreement with the labelled claims
 	/usr/bin/time -l $(PY) backend/scripts/rag_judge.py calibrate --model $(JUDGE_MODEL) \
 		--out $(RAG)/calibration/llama3.2-3b_judge-v2.json 2> $(RAG)/benchmarks/time_llama3.2-3b_calibrate_v2.txt
+
+labels-export:    ## Write examples/rag/labels/claims_review.csv for review in Excel / Google Sheets
+	$(PY) backend/scripts/labels_csv.py export
+
+labels-import:    ## Apply rows marked Reviewed: make labels-import REVIEWER="Your Name" [CSV=path] [DRY=1]
+	@test -n "$(REVIEWER)" || (echo 'usage: make labels-import REVIEWER="Your Name" [CSV=path] [DRY=1]'; exit 2)
+	$(PY) backend/scripts/labels_csv.py $(if $(CSV),--csv "$(CSV)") import --reviewer "$(REVIEWER)" $(if $(DRY),--dry-run)

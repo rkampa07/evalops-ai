@@ -50,6 +50,12 @@ def calibrate(args) -> None:
     items = [json.loads(line) for line in args.labels.read_text().splitlines() if line.strip()]
     if args.source:
         items = [i for i in items if i["source"].split(":")[0] == args.source]
+    if args.reviewed_only:
+        items = [i for i in items if i["label_status"] == "reviewed"]
+        if not items:
+            sys.exit(
+                "no reviewed labels yet; review them first (labels_csv.py or review_labels.py)"
+            )
     backend = None if args.heuristic_only else MLXBackend(args.model)
     if backend:
         backend.load()
@@ -101,9 +107,10 @@ def calibrate(args) -> None:
         },
         "items": rows,
     }
+    report["subset"] = args.source or "all"
+    report["reviewed_only"] = args.reviewed_only
     if backend:
         report["judge"] = judge_info(backend, args.judge_prompt)
-        report["subset"] = args.source or "all"
         report["judge_errors"] = sum(r["judge"] == "error" for r in rows)
         report["benchmark"] = {
             "model_load_seconds": round(backend.load_seconds or 0, 2),
@@ -179,6 +186,7 @@ def main() -> None:
     cal.add_argument("--heuristic-only", action="store_true")
     cal.add_argument("--judge-prompt", choices=sorted(JUDGE_PROMPTS), default=JUDGE_PROMPT_VERSION)
     cal.add_argument("--source", choices=["constructed", "generated"], help="label subset")
+    cal.add_argument("--reviewed-only", action="store_true", help="use only reviewed labels")
     cal.add_argument("--out", type=Path, required=True)
     cal.set_defaults(func=calibrate)
 
