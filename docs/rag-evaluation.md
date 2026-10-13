@@ -101,7 +101,7 @@ kept, such as "I'm sorry to hear…"; excluded from the metrics below and report
    *My Label* is pre-filled with the draft label, and every row you haven't reviewed is
    **Unreviewed**. Rows you already reviewed (e.g. with `review_labels.py`) show as Reviewed.
 
-2. **Review** in a spreadsheet:
+2. **Review** in a spreadsheet, following the [labeling guideline](labeling-guideline.md):
    - *Google Sheets*: File → Import → Upload → "Replace spreadsheet". When done: File → Download →
      Comma-separated values (.csv).
    - *Excel*: open the file directly. When done: File → Save As → **CSV UTF-8 (Comma delimited)**.

@@ -286,3 +286,18 @@ def test_hints_for_unknown_ids_are_reported(tmp_path, items):
     hints["zzz"] = lab.Hint("x", "y", True)
     with pytest.raises(ValueError, match="zzz"):
         lab.export_csv(items, KB, tmp_path / "p.csv", hints=hints)
+
+
+def test_ai_recommendation_is_kept_but_never_becomes_a_label(tmp_path, items):
+    rec = {"label": "unsupported", "explanation": "x", "status": "AI recommendation only"}
+    items[0]["ai_recommendation"] = rec  # draft label is "supported"
+    out = tmp_path / "review.csv"
+    lab.export_csv(items, KB, out)
+    rows = read_csv(out)
+    assert rows[0]["My Label"] == "supported" and rows[0]["Review Status"] == "Unreviewed"
+    updated, report = lab.import_csv(items, out, reviewer="Rithik")
+    assert report.imported == [] and updated[0]["label"] == "supported"
+    rows[0]["Review Status"] = "Reviewed"  # the human confirms the DRAFT label
+    write_csv(out, rows)
+    updated, _ = lab.import_csv(items, out, reviewer="Rithik")
+    assert updated[0]["label"] == "supported" and updated[0]["ai_recommendation"] == rec

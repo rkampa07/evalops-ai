@@ -144,6 +144,7 @@ docs/              architecture, methodology, customer scenario, demo script, ro
 - [Evaluation methodology](docs/evaluation-methodology.md)
 - [Customer scenario](docs/customer-scenario.md): Kestrel Home Goods (fictional)
 - [RAG evaluation with local models](docs/rag-evaluation.md): methodology, judge calibration, benchmarks
+- [Claim labeling guideline](docs/labeling-guideline.md): rules for supported / unsupported / not_a_claim
 - [Five-minute demo script](docs/demo-script.md)
 - [Roadmap](docs/roadmap.md)
 
