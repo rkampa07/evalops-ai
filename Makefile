@@ -4,7 +4,7 @@ PIP     := backend/.venv/bin/pip
 API_URL ?= http://127.0.0.1:8000
 
 .PHONY: setup setup-local-ai backend frontend seed migrate test test-backend test-frontend lint check clean-db \
-	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import
+	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import lock
 
 GEN_MODEL   ?= mlx-community/Qwen2.5-1.5B-Instruct-4bit
 JUDGE_MODEL ?= mlx-community/Llama-3.2-3B-Instruct-4bit
@@ -12,11 +12,14 @@ RAG         := examples/rag
 
 setup:            ## Create the venv and install backend + frontend dependencies
 	test -d backend/.venv || python3 -m venv backend/.venv
-	$(PIP) install -q -e ".[dev]"
-	cd frontend && npm install --no-fund --no-audit
+	$(PIP) install -q --require-hashes -r requirements/tooling.lock
+	$(PIP) install -q --require-hashes -r requirements/dev.lock
+	$(PIP) install -q --no-deps --no-build-isolation -e .
+	cd frontend && npm ci --no-fund --no-audit
 
 setup-local-ai:   ## Optional: MLX for local generation/judging (models are downloaded separately)
-	$(PIP) install -q -e ".[dev,local-ai]"
+	$(PIP) install -q --require-hashes -r requirements/local-ai.lock
+	$(PIP) install -q --no-deps --no-build-isolation -e .
 
 backend:          ## Run the API on http://127.0.0.1:8000 (auto-migrates)
 	cd backend && .venv/bin/uvicorn evalops.main:app --host 127.0.0.1 --port 8000 --reload
@@ -43,7 +46,8 @@ lint:
 	backend/.venv/bin/ruff format --check backend tests
 	cd frontend && npx tsc && npx eslint .
 
-check: lint test  ## Everything CI would run
+check: lint test  ## Lint and tests used by CI
+	cd frontend && npm run build
 
 clean-db:         ## Delete the local SQLite database (backend/data/evalops.db only)
 	rm -f backend/data/evalops.db
@@ -72,3 +76,12 @@ labels-export:    ## Write examples/rag/labels/claims_review.csv for review in E
 labels-import:    ## Apply rows marked Reviewed: make labels-import REVIEWER="Your Name" [CSV=path] [DRY=1]
 	@test -n "$(REVIEWER)" || (echo 'usage: make labels-import REVIEWER="Your Name" [CSV=path] [DRY=1]'; exit 2)
 	$(PY) backend/scripts/labels_csv.py $(if $(CSV),--csv "$(CSV)") import --reviewer "$(REVIEWER)" $(if $(DRY),--dry-run)
+
+lock:             ## Regenerate hash-pinned lockfiles using Python 3.13
+	$(PY) -c 'import sys; assert sys.version_info[:2] == (3, 13), "Lock generation requires Python 3.13"'
+	backend/.venv/bin/pip-compile -q --generate-hashes --allow-unsafe --strip-extras \
+		--output-file requirements/tooling.lock requirements/tooling.in
+	backend/.venv/bin/pip-compile -q --generate-hashes --strip-extras --extra dev \
+		--output-file requirements/dev.lock pyproject.toml
+	backend/.venv/bin/pip-compile -q --generate-hashes --strip-extras --extra dev --extra local-ai \
+		--output-file requirements/local-ai.lock pyproject.toml

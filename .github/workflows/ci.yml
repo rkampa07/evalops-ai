@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    name: Backend (lint, format, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install locked dependencies (no optional MLX extra)
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install --require-hashes -r requirements/tooling.lock
+          backend/.venv/bin/pip install --require-hashes -r requirements/dev.lock
+          backend/.venv/bin/pip install --no-deps --no-build-isolation -e .
+      - name: Ruff lint
+        run: backend/.venv/bin/ruff check backend tests
+      - name: Ruff format check
+        run: backend/.venv/bin/ruff format --check backend tests
+      - name: Pytest (unit, integration, migration, golden regression)
+        run: backend/.venv/bin/pytest
+
+  frontend:
+    name: Frontend (typecheck, lint, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: ESLint
+        run: npm run lint
+      - name: Unit tests (Vitest)
+        run: npm test
+      - name: Production build
+        run: npm run build
