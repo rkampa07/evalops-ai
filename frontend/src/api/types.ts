@@ -4,6 +4,7 @@ export interface Dataset {
   id: number;
   name: string;
   description: string;
+  version: number;
   created_at: string;
   updated_at: string;
   test_case_count: number;
@@ -24,6 +25,8 @@ export interface TestCaseInput {
 export interface TestCase extends Required<TestCaseInput> {
   id: number;
   dataset_id: number;
+  version: number;
+  content_hash: string;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +71,9 @@ export interface Result {
   metrics: CaseMetrics;
   failures: Failure[];
   tags: string[];
+  case_version?: number | null;
+  case_hash?: string | null;
+  case_snapshot?: Record<string, unknown> | null;
 }
 
 export interface RunSummary {
@@ -104,6 +110,8 @@ export interface Run {
   config: EvalConfig;
   summary: RunSummary;
   pass_rate: number | null;
+  methodology_version: string;
+  dataset_version: number | null;
   created_at: string;
 }
 
@@ -159,7 +167,9 @@ export type CaseChangeKind =
   | "unchanged_pass"
   | "unchanged_fail"
   | "only_in_baseline"
-  | "only_in_candidate";
+  | "only_in_candidate"
+  | "definition_changed"
+  | "definition_unknown";
 
 export interface CaseChange {
   case_key: string;
@@ -172,10 +182,20 @@ export interface CaseChange {
   candidate_failures: Failure[];
 }
 
+export interface CompatibilityIssue {
+  severity: "error" | "warning";
+  kind: string;
+  message: string;
+}
+
 export interface Comparison {
   dataset_id: number;
   baseline: RunRef;
   candidate: RunRef;
+  /** False when the runs can't be compared; has_regression then makes no claim. */
+  compatible: boolean;
+  compatibility_issues: CompatibilityIssue[];
+  comparable_cases: number;
   has_regression: boolean;
   regression_reasons: string[];
   metric_deltas: MetricDelta[];

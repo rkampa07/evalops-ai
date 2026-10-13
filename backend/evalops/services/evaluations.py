@@ -8,8 +8,17 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from ..engine import gates as gate_engine
+from ..engine.metrics import regex_time_budget
 from ..engine.regression import CaseSnapshot, CompareConfig, compare_runs
-from ..engine.scoring import CaseSpec, EvalConfig, ResponseSpec, score_case, summarize
+from ..engine.scoring import (
+    CaseResult,
+    CaseSpec,
+    EvalConfig,
+    ResponseSpec,
+    score_case,
+    summarize,
+)
+from ..engine.versioning import METHODOLOGY_VERSION, case_definition, methodology_compatibility
 from ..errors import NotFoundError, UnprocessableError
 from ..models import EvaluationResult, EvaluationRun
 from ..repositories.datasets import DatasetRepository, TestCaseRepository
@@ -17,6 +26,7 @@ from ..repositories.runs import RunRepository
 from ..schemas import (
     CompareConfigIn,
     ComparisonOut,
+    EvalConfigIn,
     GateConfigIn,
     GateEvaluationOut,
     GateRequest,
@@ -29,6 +39,10 @@ from ..schemas import (
     RunRef,
 )
 from .reporting import render_markdown
+
+# Upper bound on total JSON-Schema regex matching time per run (defence in depth on top of the
+# per-match limit in engine/metrics.py).
+RUN_REGEX_BUDGET_S = 5.0
 
 
 def run_out(run: EvaluationRun) -> RunOut:
@@ -74,31 +88,9 @@ class EvaluationService:
 
         results = []
         rows = []
-        for case in cases:
-            spec = CaseSpec(
-                key=case.key,
-                expected_output=case.expected_output,
-                required_terms=list(case.required_terms),
-                forbidden_terms=list(case.forbidden_terms),
-                json_schema=case.json_schema,
-                max_latency_ms=case.max_latency_ms,
-                tags=list(case.tags),
-            )
-            response = responses.get(case.key)
-            result = score_case(spec, response, config)
-            results.append(result)
-            rows.append(
-                EvaluationResult(
-                    test_case_id=case.id,
-                    case_key=case.key,
-                    output=response.output if response else None,
-                    latency_ms=response.latency_ms if response else None,
-                    passed=result.passed,
-                    metrics=result.metrics,
-                    failures=result.failures,
-                    tags=result.tags,
-                )
-            )
+        with regex_time_budget(RUN_REGEX_BUDGET_S):
+            for case in cases:
+                results.append(self._score(case, responses.get(case.key), config, rows))
 
         summary = summarize(results)
         run = EvaluationRun(
@@ -110,11 +102,49 @@ class EvaluationService:
             config=asdict(config),
             summary=summary,
             pass_rate=summary["pass_rate"],
+            methodology_version=METHODOLOGY_VERSION,
+            dataset_version=dataset.version,
             results=rows,
         )
         self.runs.add(run)
         self.s.commit()
         return self.get_run(run.id)
+
+    @staticmethod
+    def _score(case, response, config: EvalConfig, rows: list[EvaluationResult]) -> CaseResult:
+        """Score one case and append its result row, snapshotting the definition used."""
+        definition = case_definition(case)
+        spec = CaseSpec(
+            key=case.key,
+            expected_output=case.expected_output,
+            required_terms=list(case.required_terms),
+            forbidden_terms=list(case.forbidden_terms),
+            json_schema=case.json_schema,
+            max_latency_ms=case.max_latency_ms,
+            tags=list(case.tags),
+        )
+        result = score_case(spec, response, config)
+        rows.append(
+            EvaluationResult(
+                test_case_id=case.id,
+                case_key=case.key,
+                output=response.output if response else None,
+                latency_ms=response.latency_ms if response else None,
+                passed=result.passed,
+                metrics=result.metrics,
+                failures=result.failures,
+                tags=result.tags,
+                case_version=case.version,
+                case_hash=case.content_hash,
+                case_snapshot={
+                    "key": case.key,
+                    **definition,
+                    "tags": list(case.tags),
+                    "version": case.version,
+                },
+            )
+        )
+        return result
 
     def _get(self, run_id: int, *, with_results: bool = False) -> EvaluationRun:
         run = self.runs.get(run_id, with_results=with_results)
@@ -155,18 +185,81 @@ class EvaluationService:
                 f"candidate dataset {candidate.dataset_id})"
             )
 
-        def snapshots(run: EvaluationRun) -> dict[str, CaseSnapshot]:
+        b_res = {r.case_key: r for r in baseline.results}
+        c_res = {r.case_key: r for r in candidate.results}
+        issues = self._run_compatibility_issues(baseline, candidate)
+
+        # Cases are comparable only if both runs scored them against the same definition.
+        excluded: dict[str, str] = {}
+        for key in sorted(b_res.keys() & c_res.keys()):
+            b_hash, c_hash = b_res[key].case_hash, c_res[key].case_hash
+            if b_hash is None or c_hash is None:
+                excluded[key] = "definition_unknown"
+            elif b_hash != c_hash:
+                excluded[key] = "definition_changed"
+        for kind, explanation in (
+            ("definition_changed", "changed definition between the runs"),
+            ("definition_unknown", "have no recorded definition (legacy results)"),
+        ):
+            keys = [k for k, v in excluded.items() if v == kind]
+            if keys:
+                issues.append(
+                    {
+                        "severity": "warning",
+                        "kind": kind,
+                        "message": f"{len(keys)} case(s) {explanation} and were excluded "
+                        f"from regression detection: {keys}",
+                    }
+                )
+        only = sorted(b_res.keys() ^ c_res.keys())
+        if only:
+            issues.append(
+                {
+                    "severity": "warning",
+                    "kind": "case_set_changed",
+                    "message": f"{len(only)} case(s) exist in only one run and were excluded "
+                    f"from regression detection: {only}",
+                }
+            )
+
+        comparable = sorted((b_res.keys() & c_res.keys()) - excluded.keys())
+        if not comparable:
+            issues.append(
+                {
+                    "severity": "error",
+                    "kind": "no_comparable_cases",
+                    "message": "no test case has the same definition in both runs",
+                }
+            )
+
+        def summary_of(results: dict[str, EvaluationResult]) -> dict:
+            return summarize(
+                [
+                    CaseResult(
+                        k,
+                        results[k].passed,
+                        results[k].metrics,
+                        results[k].failures,
+                        list(results[k].tags),
+                    )
+                    for k in comparable
+                ]
+            )
+
+        def snapshots(results: dict[str, EvaluationResult]) -> dict[str, CaseSnapshot]:
             return {
-                r.case_key: CaseSnapshot(r.passed, r.metrics.get("token_f1"), r.failures)
-                for r in run.results
+                k: CaseSnapshot(r.passed, r.metrics.get("token_f1"), r.failures)
+                for k, r in results.items()
             }
 
         result = compare_runs(
-            baseline.summary,
-            candidate.summary,
-            snapshots(baseline),
-            snapshots(candidate),
+            summary_of(b_res),
+            summary_of(c_res),
+            snapshots(b_res),
+            snapshots(c_res),
             CompareConfig(**cfg.model_dump()),
+            excluded=excluded,
+            issues=issues,
         )
         return ComparisonOut(
             dataset_id=baseline.dataset_id,
@@ -174,6 +267,46 @@ class EvaluationService:
             candidate=run_ref(candidate),
             **result,
         )
+
+    @staticmethod
+    def _run_compatibility_issues(
+        baseline: EvaluationRun, candidate: EvaluationRun
+    ) -> list[dict[str, str]]:
+        issues: list[dict[str, str]] = []
+        b_cfg = EvalConfigIn(**baseline.config).model_dump()
+        c_cfg = EvalConfigIn(**candidate.config).model_dump()
+        diffs = [f"{k}: {b_cfg[k]} -> {c_cfg[k]}" for k in b_cfg if b_cfg[k] != c_cfg[k]]
+        if diffs:
+            issues.append(
+                {
+                    "severity": "error",
+                    "kind": "scoring_config",
+                    "message": "runs were scored with different scoring configs ("
+                    + "; ".join(diffs)
+                    + "); re-run both with the same config to compare",
+                }
+            )
+        b_ver, c_ver = baseline.methodology_version, candidate.methodology_version
+        severity = methodology_compatibility(b_ver, c_ver)
+        if severity == "error":
+            issues.append(
+                {
+                    "severity": "error",
+                    "kind": "methodology_version",
+                    "message": f"scoring methodology {b_ver} vs {c_ver} differs in major "
+                    "version; scores are not comparable",
+                }
+            )
+        elif severity == "warning":
+            issues.append(
+                {
+                    "severity": "warning",
+                    "kind": "methodology_version",
+                    "message": f"scoring methodology {b_ver} vs {c_ver}: compatible "
+                    "(scores for well-formed inputs are unchanged between these versions)",
+                }
+            )
+        return issues
 
     # ------------------------------------------------------------ gates
 
@@ -190,7 +323,9 @@ class EvaluationService:
             GateEvaluationOut(
                 candidate_run_id=candidate.id,
                 baseline_run_id=req.baseline_run_id,
-                regression_detected=comparison.has_regression if comparison else None,
+                regression_detected=(
+                    comparison.has_regression if comparison and comparison.compatible else None
+                ),
                 **outcome,
             ),
             comparison,
@@ -222,6 +357,19 @@ class EvaluationService:
         gate_eval, comparison = self.evaluate_gates(
             GateRequest(candidate_run_id=run_id, baseline_run_id=baseline_id, gates=policy)
         )
+        if comparison is not None:
+            if not comparison.compatible:
+                reasons = "; ".join(
+                    i.message for i in comparison.compatibility_issues if i.severity == "error"
+                )
+                notes.append(
+                    f"Baseline run #{baseline_id} is not comparable with this run ({reasons}). "
+                    "Regression detection was not performed and comparison gates failed closed."
+                )
+            else:
+                notes.extend(
+                    f"Comparison warning: {i.message}" for i in comparison.compatibility_issues
+                )
         if run.summary.get("responded_cases", 0) < run.summary.get("total_cases", 0):
             missing = run.summary["total_cases"] - run.summary["responded_cases"]
             notes.append(

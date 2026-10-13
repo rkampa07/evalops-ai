@@ -31,6 +31,8 @@ class Dataset(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # Incremented whenever the set of test cases or any case definition changes.
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -59,6 +61,9 @@ class TestCase(Base):
     json_schema: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     max_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # Incremented when the scoring-relevant definition changes (see engine/versioning.py).
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -81,6 +86,12 @@ class EvaluationRun(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     summary: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     pass_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Scoring rules used (engine/versioning.py). Runs created before versioning are "1.0.0".
+    methodology_version: Mapped[str] = mapped_column(
+        String(20), server_default="1.0.0", nullable=False
+    )
+    # Dataset.version at evaluation time; NULL for runs created before version tracking.
+    dataset_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
@@ -110,5 +121,10 @@ class EvaluationResult(Base):
     metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     failures: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # Definition the output was scored against. NULL only for legacy results whose case was
+    # edited or deleted before version tracking existed (the definition can't be recovered).
+    case_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    case_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    case_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     run: Mapped[EvaluationRun] = relationship(back_populates="results")

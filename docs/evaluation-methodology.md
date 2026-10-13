@@ -70,6 +70,14 @@ Terms are normalized the same way as text and matched as **whole-token phrases**
 
 ### JSON Schema
 
+Regex safety: user-supplied `pattern` values run through the `regex` module with a
+**100 ms limit per match** and a **5 s total budget per run**. A timeout fails the case
+("exceeded the evaluation limit"); it never stalls the server. `patternProperties` is
+rejected when a case is saved, and again when one is evaluated, because `jsonschema`
+evaluates those regexes internally without a time limit. Patterns are limited to 1,000
+characters and 50 per schema. Any other schema-evaluation error (e.g. an unresolvable
+remote `$ref`) fails the case instead of failing the request.
+
 The output is `strip()`ped and parsed with `json.loads`. Prose around the JSON ("Here is the order: {…}") fails as `json_parsed: false`. That is intentional, because downstream parsers fail the same way. Schemas are validated when the test case is saved, so an invalid schema can never silently pass.
 
 ### Latency
@@ -101,6 +109,48 @@ When no case applies, a rate is **`null` ("n/a"), never 0 or 1**, so a dataset w
 ## Regression detection (baseline vs candidate)
 
 Both runs must use the same dataset. Cases are joined on `case_key`.
+
+### Comparison compatibility (checked before any regression claim)
+
+A difference between two runs is only a *model* regression if everything else was held
+constant. Before comparing, EvalOps checks:
+
+| Check | If it fails | Severity |
+|---|---|---|
+| Same scoring config (`min_token_f1`, `require_exact_match`, `case_sensitive`, `default_max_latency_ms`) | Runs are **not comparable** | error |
+| Same scoring-methodology **major** version | Not comparable | error |
+| Methodology differs only in minor/patch | Comparable, warning shown | warning |
+| Each case scored against an identical definition (hash of input, reference, terms, schema, latency limit) | That case is excluded as `definition_changed` | warning |
+| Legacy result with no recorded definition | That case is excluded as `definition_unknown` | warning |
+| Case exists in only one run | Excluded (`only_in_baseline` / `only_in_candidate`) | warning |
+| At least one comparable case remains | Otherwise not comparable (`no_comparable_cases`) | error |
+
+When runs are **not comparable**, the comparison returns `compatible: false`,
+`has_regression: false` with no metric deltas or case verdicts, and lists the reasons.
+Comparison gates (`max_pass_rate_drop`, `max_regressed_cases`) **fail closed** with a
+"not comparable" message. The release is blocked, but no regression is claimed.
+
+When comparable, aggregate metric deltas are **recomputed over the comparable cases only**, so
+an edited, added or removed case can't move the baseline or candidate averages. A run's own
+gates (`min_pass_rate`, etc.) still use its full summary.
+
+### Versioning
+
+- **Test case**: `version` increments and `content_hash` (SHA-256 of the canonical scoring
+  definition) changes whenever input, reference, terms, schema or latency limit change. Editing
+  only tags changes neither, because tags are labels, not scoring rules.
+- **Dataset**: `version` increments whenever a case is added, deleted, renamed or its
+  definition changes.
+- **Run**: records `dataset_version` and `methodology_version`; every result stores
+  `case_version`, `case_hash` and a full `case_snapshot` of the definition it was scored
+  against, so history survives later edits and deletions.
+- **Methodology** (`engine/versioning.py`, semver): MAJOR = scores may change for the same
+  inputs (not comparable); MINOR = additive/robustness changes that leave well-formed inputs'
+  scores unchanged; PATCH = no scoring impact. 1.0.0 → 1.1.0 added time-limited regex
+  evaluation (below).
+- **Pre-existing data** (migration `0002`): runs are marked methodology `1.0.0`. A legacy
+  result gets a definition hash only if its test case still exists and was not modified after
+  the run; otherwise its definition is recorded as unknown rather than guessed.
 
 **Per case** (`regression.compare_runs`):
 

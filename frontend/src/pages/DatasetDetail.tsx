@@ -46,7 +46,11 @@ export function DatasetDetail() {
     <>
       <PageHeader
         title={dataset.name}
-        subtitle={dataset.description || "No description"}
+        subtitle={
+          <>
+            {dataset.description || "No description"} <Badge tone="neutral">{`version ${dataset.version}`}</Badge>
+          </>
+        }
         actions={
           <>
             <Link className="btn" to={`/runs/new?dataset=${dataset.id}`}>
@@ -106,7 +110,10 @@ export function DatasetDetail() {
                     <td className="mono">
                       <button className="link" onClick={() => setExpanded(expanded === c.id ? undefined : c.id)} aria-expanded={expanded === c.id}>
                         {c.key}
-                      </button>
+                      </button>{" "}
+                      <span className="muted small" title={`definition hash ${c.content_hash}`}>
+                        v{c.version}
+                      </span>
                     </td>
                     <td className="truncate">{c.input}</td>
                     <td>

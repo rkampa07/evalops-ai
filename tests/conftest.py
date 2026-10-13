@@ -28,6 +28,8 @@ def client(db_url: str):
         database_url=db_url,
         cors_origins=["http://localhost:5173"],
         auto_migrate=True,
+        # TestClient sends Host: testserver
+        allowed_hosts=["testserver", "localhost", "127.0.0.1"],
     )
     app = create_app(settings)
     # raise_server_exceptions=False so the 500 handler is exercised like in production

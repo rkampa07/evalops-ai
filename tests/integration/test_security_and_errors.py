@@ -71,7 +71,11 @@ def test_request_body_size_limit(db_url):
 
     from evalops.main import create_app
 
-    app = create_app(Settings(database_url=db_url, cors_origins=[], max_body_bytes=200))
+    app = create_app(
+        Settings(
+            database_url=db_url, cors_origins=[], max_body_bytes=200, allowed_hosts=["testserver"]
+        )
+    )
     with TestClient(app) as c:
         r = c.post("/datasets", json={"name": "x", "description": "y" * 500})
         assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large"
@@ -86,3 +90,73 @@ def test_oversized_output_rejected(client, seeded):
         "responses": [{"case_key": "latency-greeting", "output": "x" * 100_001}],
     }
     assert client.post("/evaluations/runs", json=body).status_code == 422
+
+
+# ---------------------------------------------------------------- trusted hosts
+
+
+def test_untrusted_host_header_rejected(client):
+    r = client.get("/health", headers={"Host": "attacker.example"})
+    assert r.status_code == 400
+    r = client.post("/datasets", json={"name": "x"}, headers={"Host": "rebind.attacker.example"})
+    assert r.status_code == 400
+    assert client.get("/datasets").json() == []  # nothing was created
+
+
+def test_trusted_host_with_port_accepted(client):
+    assert client.get("/health", headers={"Host": "127.0.0.1:8000"}).status_code == 200
+    assert client.get("/health", headers={"Host": "localhost:8000"}).status_code == 200
+
+
+def test_allowed_hosts_from_env_drop_wildcard(monkeypatch):
+    monkeypatch.setenv("EVALOPS_ALLOWED_HOSTS", "*, api.internal ,localhost")
+    assert Settings.from_env().allowed_hosts == ["api.internal", "localhost"]
+    monkeypatch.delenv("EVALOPS_ALLOWED_HOSTS")
+    assert Settings.from_env().allowed_hosts == ["localhost", "127.0.0.1"]
+
+
+# ---------------------------------------------------------------- regex safety (API level)
+
+EVIL = {"type": "string", "pattern": "^(a|a)*$"}  # exponential backtracking in Python `re`
+
+
+def test_catastrophic_pattern_cannot_stall_a_run(client):
+    import json
+    import time
+
+    ds = client.post("/datasets", json={"name": "redos"}).json()
+    r = client.post(
+        f"/datasets/{ds['id']}/test-cases", json={"key": "k", "input": "q", "json_schema": EVIL}
+    )
+    assert r.status_code == 201  # the pattern is a valid regex; it is dangerous only at runtime
+    start = time.perf_counter()
+    run = client.post(
+        "/evaluations/runs",
+        json={
+            "dataset_id": ds["id"],
+            "model_name": "m",
+            "prompt_version": "p",
+            "responses": [{"case_key": "k", "output": json.dumps("a" * 40 + "!")}],
+        },
+    )
+    elapsed = time.perf_counter() - start
+    assert run.status_code == 201
+    assert elapsed < 3, f"run took {elapsed:.1f}s"
+    result = run.json()["results"][0]
+    assert result["passed"] is False
+    assert "evaluation limit" in result["failures"][0]["message"]
+
+
+def test_unsafe_or_invalid_schemas_rejected_at_save_time(client):
+    ds = client.post("/datasets", json={"name": "schemas"}).json()
+    url = f"/datasets/{ds['id']}/test-cases"
+
+    def post(schema):
+        return client.post(url, json={"key": "k", "input": "q", "json_schema": schema})
+
+    r = post({"type": "object", "patternProperties": {"^x": {"type": "string"}}})
+    assert r.status_code == 422 and "patternProperties" in r.json()["error"]["message"]
+    r = post({"type": "string", "pattern": "(unclosed"})
+    assert r.status_code == 422 and "regex" in r.json()["error"]["message"]
+    r = post({"type": "string", "pattern": "a" * 1001})
+    assert r.status_code == 422 and "longer than" in r.json()["error"]["message"]

@@ -51,6 +51,7 @@ class DatasetOut(OrmOutput):
     id: int
     name: str
     description: str
+    version: int
     created_at: datetime
     updated_at: datetime
     test_case_count: int = 0
@@ -149,6 +150,8 @@ class TestCaseOut(OrmOutput):
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+    version: int
+    content_hash: str
 
 
 # ---------------------------------------------------------------- runs
@@ -204,6 +207,9 @@ class ResultOut(OrmOutput):
     metrics: dict[str, Any]
     failures: list[Failure]
     tags: list[str]
+    case_version: int | None = None
+    case_hash: str | None = None
+    case_snapshot: dict[str, Any] | None = None
 
 
 class TagPassRate(BaseModel):
@@ -245,6 +251,8 @@ class RunOut(OrmOutput):
     config: EvalConfigIn
     summary: RunSummary
     pass_rate: float | None
+    methodology_version: str
+    dataset_version: int | None
     created_at: datetime
 
 
@@ -287,6 +295,8 @@ class CaseChange(BaseModel):
         "unchanged_fail",
         "only_in_baseline",
         "only_in_candidate",
+        "definition_changed",
+        "definition_unknown",
     ]
     baseline_passed: bool | None
     candidate_passed: bool | None
@@ -304,10 +314,22 @@ class RunRef(BaseModel):
     created_at: datetime
 
 
+class CompatibilityIssue(BaseModel):
+    severity: Literal["error", "warning"]
+    kind: str
+    message: str
+
+
 class ComparisonOut(BaseModel):
     dataset_id: int
     baseline: RunRef
     candidate: RunRef
+    # False when the runs can't be compared (different scoring config, incompatible
+    # methodology, or no case with an identical definition). has_regression is then False
+    # and makes no claim; see compatibility_issues.
+    compatible: bool
+    compatibility_issues: list[CompatibilityIssue]
+    comparable_cases: int
     has_regression: bool
     regression_reasons: list[str]
     metric_deltas: list[MetricDelta]

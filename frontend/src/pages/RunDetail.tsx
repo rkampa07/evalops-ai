@@ -41,6 +41,10 @@ export function RunDetail() {
             <strong>{run.model_name}</strong> · prompt {run.prompt_version} · dataset{" "}
             <Link to={`/datasets/${run.dataset_id}`}>{run.dataset_name}</Link> · {dateTime(run.created_at)}
             {run.label && <> · {run.label}</>}
+            <br />
+            <span className="small">
+              dataset version {run.dataset_version ?? "unknown (pre-versioning run)"} · scoring methodology {run.methodology_version}
+            </span>
           </>
         }
         actions={

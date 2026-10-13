@@ -120,6 +120,8 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; background: var(
 .verdict { font-size: 18px; font-weight: 750; padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; letter-spacing: 0.02em; }
 .verdict-good { background: var(--good-bg); color: var(--good); }
 .verdict-bad { background: var(--bad-bg); color: var(--bad); }
+.verdict-warn { background: var(--warn-bg); color: var(--warn); }
+.issues { padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 
 .form { display: flex; flex-direction: column; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 4px; font-weight: 550; font-size: 13px; }

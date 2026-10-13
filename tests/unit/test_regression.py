@@ -95,3 +95,40 @@ def test_cases_only_in_one_run():
     r = compare_runs(summary(), summary(), {"a": snap(True)}, {"b": snap(True)})
     assert r["case_counts"]["only_in_baseline"] == 1
     assert r["case_counts"]["only_in_candidate"] == 1
+
+
+def test_excluded_cases_are_listed_but_never_regressions():
+    r = compare_runs(
+        summary(),
+        summary(),
+        {"a": snap(True), "b": snap(True)},
+        {"a": snap(False), "b": snap(True)},
+        excluded={"a": "definition_changed"},
+    )
+    assert r["compatible"] is True and r["comparable_cases"] == 1
+    assert not r["has_regression"]
+    assert {c["case_key"]: c["change"] for c in r["case_changes"]} == {
+        "a": "definition_changed",
+        "b": "unchanged_pass",
+    }
+    assert r["case_counts"]["definition_changed"] == 1
+
+
+def test_error_issue_makes_runs_incomparable():
+    issue = {"severity": "error", "kind": "scoring_config", "message": "configs differ"}
+    r = compare_runs(
+        summary(pass_rate=1.0),
+        summary(pass_rate=0.0),
+        {"a": snap(True)},
+        {"a": snap(False)},
+        issues=[issue],
+    )
+    assert r["compatible"] is False and r["has_regression"] is False
+    assert r["metric_deltas"] == [] and r["case_changes"] == []
+    assert r["compatibility_issues"] == [issue]
+
+
+def test_warning_issue_keeps_runs_comparable():
+    issue = {"severity": "warning", "kind": "methodology_version", "message": "minor"}
+    r = compare_runs(summary(), summary(), {"a": snap(True)}, {"a": snap(False)}, issues=[issue])
+    assert r["compatible"] is True and r["has_regression"] is True

@@ -56,16 +56,17 @@ erDiagram
     EVALUATION_RUN ||--o{ EVALUATION_RESULT : produces
     TEST_CASE |o--o{ EVALUATION_RESULT : "scored as (nullable)"
 
-    DATASET { int id PK  string name UK  text description  datetime created_at }
-    TEST_CASE { int id PK  int dataset_id FK  string key "unique per dataset"  text input  text expected_output  json required_terms  json forbidden_terms  json json_schema  float max_latency_ms  json tags }
-    EVALUATION_RUN { int id PK  int dataset_id FK  string model_name  string prompt_version  string label  json config  json summary  float pass_rate  datetime created_at }
-    EVALUATION_RESULT { int id PK  int run_id FK  int test_case_id FK  string case_key  text output  float latency_ms  bool passed  json metrics  json failures  json tags }
+    DATASET { int id PK  string name UK  text description  int version  datetime created_at }
+    TEST_CASE { int id PK  int dataset_id FK  string key "unique per dataset"  text input  text expected_output  json required_terms  json forbidden_terms  json json_schema  float max_latency_ms  json tags  int version  string content_hash }
+    EVALUATION_RUN { int id PK  int dataset_id FK  string model_name  string prompt_version  string label  json config  json summary  float pass_rate  string methodology_version  int dataset_version  datetime created_at }
+    EVALUATION_RESULT { int id PK  int run_id FK  int test_case_id FK  string case_key  text output  float latency_ms  bool passed  json metrics  json failures  json tags  int case_version  string case_hash  json case_snapshot }
 ```
 
 Design notes:
 
-- **Results are snapshots.** A result stores `case_key`, tags, metrics and failures at evaluation time. Editing or deleting a test case later never rewrites history (`test_case_id` becomes `NULL` on delete).
-- **Comparisons join on `case_key`**, not on IDs, so runs stay comparable across case edits.
+- **Results are snapshots.** A result stores `case_key`, tags, metrics, failures and the full case definition (`case_snapshot`, `case_hash`, `case_version`) at evaluation time. Editing or deleting a test case later never rewrites history (`test_case_id` becomes `NULL` on delete).
+- **Comparisons join on `case_key` and verify `case_hash`.** A case whose definition differs between two runs is excluded rather than counted as a regression; runs with different scoring configs or incompatible methodology versions are reported as not comparable.
+- **Versions:** `datasets.version`, `test_cases.version` + `content_hash`, `evaluation_runs.dataset_version` + `methodology_version` (migration `0002`).
 - **Run summaries are stored** as JSON on the run. History pages and comparisons don't need to re-aggregate results.
 - `RESTRICT` on `evaluation_runs.dataset_id` means a dataset can't be deleted while runs reference it; the service returns 409 with a clear message.
 - Schema changes go through **Alembic**. `tests/integration/test_migrations.py` fails if the ORM and migrations drift apart. The API applies migrations on startup (`EVALOPS_AUTO_MIGRATE`).
@@ -109,6 +110,8 @@ Comparison (`GET /evaluations/compare`), gates (`POST /evaluations/gates`) and r
 | CORS | Allow-list from `EVALOPS_CORS_ORIGINS` (default: the Vite dev origin only); `*` is dropped; no credentials |
 | Input validation | Pydantic bounds on every field, key/tag patterns, unknown fields rejected, JSON Schemas validated before storage |
 | Payload size | Per-field limits plus a 10 MiB `Content-Length` cap (413) |
+| DNS rebinding | `TrustedHostMiddleware` with an allow-list from `EVALOPS_ALLOWED_HOSTS` (default `localhost,127.0.0.1`; `*` is dropped) |
+| ReDoS | JSON Schema `pattern` matched with a per-match timeout and per-run budget; `patternProperties` rejected (see methodology) |
 | Error leakage | 500s return a generic message; validation errors omit echoed input |
 | Secrets | None required; `.env` is git-ignored; `.env.example` contains no secrets |
 | SQL injection | SQLAlchemy parameterized queries only |

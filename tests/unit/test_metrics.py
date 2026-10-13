@@ -128,3 +128,61 @@ class TestPercentile:
     def test_out_of_range(self):
         with pytest.raises(ValueError):
             m.percentile([1, 2], 101)
+
+
+class TestRegexSafety:
+    EVIL = {"type": "string", "pattern": "^(a|a)*$"}
+
+    def test_catastrophic_pattern_times_out_and_fails_closed(self):
+        import json
+        import time
+
+        start = time.perf_counter()
+        r = m.validate_json_output(json.dumps("a" * 40 + "!"), self.EVIL)
+        assert time.perf_counter() - start < 1.0
+        assert r.parsed and not r.valid
+        assert "evaluation limit" in r.errors[0]
+
+    def test_normal_patterns_behave_as_before(self):
+        schema = {"type": "string", "pattern": "^KH-[0-9]{5}$"}
+        assert m.validate_json_output('"KH-10442"', schema).valid
+        r = m.validate_json_output('"KH-1"', schema)
+        assert r.errors == ["<root>: 'KH-1' does not match '^KH-[0-9]{5}$'"]
+
+    def test_property_names_pattern_is_also_protected(self):
+        schema = {"type": "object", "propertyNames": {"pattern": "^(a|a)*$"}}
+        r = m.validate_json_output('{"' + "a" * 40 + '!": 1}', schema)
+        assert not r.valid and "evaluation limit" in r.errors[0]
+
+    def test_run_budget_exhaustion_fails_closed(self):
+        with m.regex_time_budget(0.0):
+            r = m.validate_json_output('"abc"', {"type": "string", "pattern": "^a"})
+        assert not r.valid and "budget" in r.errors[0]
+
+    def test_budget_is_scoped(self):
+        with m.regex_time_budget(0.0):
+            pass
+        assert m.validate_json_output('"abc"', {"type": "string", "pattern": "^a"}).valid
+
+    def test_legacy_unsafe_schema_is_not_evaluated(self):
+        # A schema stored before the save-time rule existed must not bypass it at runtime.
+        schema = {"type": "object", "patternProperties": {"^(a|a)*$": {}}}
+        r = m.validate_json_output('{"x": 1}', schema)
+        assert not r.valid and "patternProperties" in r.errors[0]
+
+    def test_unresolvable_ref_fails_case_instead_of_crashing(self):
+        r = m.validate_json_output("{}", {"$ref": "https://example.invalid/schema.json"})
+        assert not r.valid and r.errors[0].startswith("schema evaluation error")
+
+    @pytest.mark.parametrize(
+        ("schema", "message"),
+        [
+            ({"patternProperties": {"x": {}}}, "patternProperties"),
+            ({"pattern": "("}, "regex"),  # rejected by jsonschema's own meta-schema check
+            ({"pattern": "a" * 1001}, "longer than"),
+            ({"allOf": [{"pattern": "a"}] * 51}, "too many patterns"),
+        ],
+    )
+    def test_definition_checks(self, schema, message):
+        with pytest.raises(ValueError, match=message):
+            m.check_json_schema_definition(schema)

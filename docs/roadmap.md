@@ -6,7 +6,7 @@ Ordered by customer value per unit of effort. Items marked **(semantic)** would 
 
 - **CLI and CI action**: `evalops run --dataset kestrel-support-v1 --responses out.json --gate policy.yaml`, exit code = gate decision. The engine is already I/O-free, so this mostly needs packaging.
 - **Saved gate policies**: name and version policies per dataset instead of passing thresholds per request; record which policy version approved each release.
-- **Dataset versioning**: immutable dataset snapshots so a run always references the exact cases it was scored against, plus a diff view between versions.
+- **Dataset version diffs** *(versioning itself is done: per-case hashes, result snapshots, comparison compatibility checks)*: a UI diff between dataset versions, and optional re-scoring of a baseline's stored outputs against the candidate's definitions so edited cases can still be compared.
 - **Per-tag gates**: e.g. `safety` tag pass rate must be 100% while `policy` may be ≥ 90%.
 - **Streaming body limit**: enforce the request size cap for chunked uploads as well (currently `Content-Length` only).
 - **Annotations**: let reviewers mark a failing case as "golden set wrong" or "accepted risk", with an audit trail.

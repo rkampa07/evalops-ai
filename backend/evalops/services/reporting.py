@@ -40,6 +40,8 @@ def render_markdown(report: ReportOut) -> str:
         f"- Run: #{run.id} {run.label or ''}".rstrip(),
         f"- Dataset: {report.dataset_name}",
         f"- Model: `{run.model_name}`, prompt version `{run.prompt_version}`",
+        f"- Dataset version: {run.dataset_version or 'unknown (pre-versioning run)'} · "
+        f"scoring methodology {run.methodology_version}",
         f"- Generated: {report.generated_at.isoformat(timespec='seconds')}",
     ]
     if report.baseline:
@@ -73,17 +75,23 @@ def render_markdown(report: ReportOut) -> str:
     if report.comparison:
         c = report.comparison
         lines += ["", "## Regression analysis", ""]
-        if c.has_regression:
-            lines += [f"- {r}" for r in c.regression_reasons]
+        if not c.compatible:
+            lines.append("**Baseline not comparable; regression detection was not performed.**")
+            lines += [f"- {_cell(i.message)}" for i in c.compatibility_issues]
         else:
-            lines.append("- No regressions detected within configured tolerances.")
-        counts = c.case_counts
-        lines += [
-            "",
-            f"Cases: {counts['regressed']} regressed, {counts['fixed']} fixed, "
-            f"{counts['f1_drop']} with F1 drop, {counts['unchanged_pass']} unchanged pass, "
-            f"{counts['unchanged_fail']} unchanged fail.",
-        ]
+            if c.has_regression:
+                lines += [f"- {r}" for r in c.regression_reasons]
+            else:
+                lines.append("- No regressions detected within configured tolerances.")
+            counts = c.case_counts
+            lines += [
+                "",
+                f"Compared {c.comparable_cases} case(s) with identical definitions: "
+                f"{counts['regressed']} regressed, {counts['fixed']} fixed, "
+                f"{counts['f1_drop']} with F1 drop, {counts['unchanged_pass']} unchanged pass, "
+                f"{counts['unchanged_fail']} unchanged fail.",
+            ]
+            lines += [f"- Warning: {_cell(i.message)}" for i in c.compatibility_issues]
 
     lines += ["", "## Failing cases", ""]
     if not report.failing_cases:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from ..engine.versioning import case_definition, definition_hash
 from ..errors import ConflictError, NotFoundError, UnprocessableError
 from ..models import Dataset, TestCase
 from ..repositories.datasets import DatasetRepository, TestCaseRepository
@@ -104,7 +105,7 @@ class DatasetService:
 
     def create_cases(self, dataset_id: int, items: list[TestCaseCreate]) -> list[TestCase]:
         """Create one or many cases atomically; any key conflict rejects the whole batch."""
-        self.get_dataset(dataset_id)
+        dataset = self.get_dataset(dataset_id)
         keys = [c.key for c in items]
         dupes = sorted({k for k in keys if keys.count(k) > 1})
         if dupes:
@@ -112,8 +113,19 @@ class DatasetService:
         clash = sorted(self.cases.existing_keys(dataset_id) & set(keys))
         if clash:
             raise ConflictError(f"test case key(s) already exist in dataset: {clash}")
-        rows = [TestCase(dataset_id=dataset_id, **c.model_dump()) for c in items]
+        rows = []
+        for item in items:
+            data = item.model_dump()
+            rows.append(
+                TestCase(
+                    dataset_id=dataset_id,
+                    version=1,
+                    content_hash=definition_hash(case_definition(data)),
+                    **data,
+                )
+            )
         self.cases.add_all(rows)
+        dataset.version += 1
         self.s.commit()
         return rows
 
@@ -136,11 +148,24 @@ class DatasetService:
 
         if validated.key != case.key and self.cases.get_by_key(case.dataset_id, validated.key):
             raise ConflictError(f"test case key {validated.key!r} already exists in dataset")
-        for field, value in validated.model_dump().items():
+
+        new_values = validated.model_dump()
+        new_hash = definition_hash(case_definition(new_values))
+        definition_changed = new_hash != case.content_hash
+        key_changed = validated.key != case.key
+        for field, value in new_values.items():
             setattr(case, field, value)
+        if definition_changed:
+            case.version += 1
+            case.content_hash = new_hash
+        if definition_changed or key_changed:
+            # Tags are labels, not scoring rules: editing only tags keeps versions unchanged.
+            case.dataset.version += 1
         self.s.commit()
         return case
 
     def delete_case(self, case_id: int) -> None:
-        self.cases.delete(self.get_case(case_id))
+        case = self.get_case(case_id)
+        case.dataset.version += 1
+        self.cases.delete(case)
         self.s.commit()

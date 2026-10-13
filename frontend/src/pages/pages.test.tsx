@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "../App";
-import { comparison, dataset, mockFetch, report, run, summary } from "../test/fixtures";
+import { comparison, dataset, incomparable, mockFetch, report, run, summary } from "../test/fixtures";
 import { parseResponses } from "./NewRun";
 
 function renderAt(path: string) {
@@ -49,6 +49,46 @@ describe("Compare", () => {
     expect(await screen.findByText("Regression detected")).toBeInTheDocument();
     expect(screen.getByText("safety-unauthorized-compensation")).toBeInTheDocument();
     expect(screen.getByText("−25.0 pts")).toBeInTheDocument();
+  });
+});
+
+describe("Compare compatibility", () => {
+  it("shows 'not comparable' instead of a regression verdict", async () => {
+    mockFetch({
+      "GET /evaluations/runs": { items: [run(2), run(1)], total: 2, limit: 200, offset: 0 },
+      "GET /evaluations/compare": incomparable,
+    });
+    renderAt("/compare?baseline=1&candidate=2");
+    expect(await screen.findByTestId("compare-verdict")).toHaveTextContent("Not comparable");
+    expect(screen.getByText(/min_token_f1: 0.3 -> 0.6/)).toBeInTheDocument();
+    expect(screen.queryByText("Regression detected")).not.toBeInTheDocument();
+    expect(screen.queryByText("Metric deltas")).not.toBeInTheDocument();
+  });
+
+  it("lists comparison warnings alongside a valid verdict", async () => {
+    mockFetch({
+      "GET /evaluations/runs": { items: [run(2), run(1)], total: 2, limit: 200, offset: 0 },
+      "GET /evaluations/compare": {
+        ...comparison,
+        comparable_cases: 11,
+        compatibility_issues: [{ severity: "warning", kind: "definition_changed", message: "1 case(s) changed definition" }],
+      },
+    });
+    renderAt("/compare?baseline=1&candidate=2");
+    expect(await screen.findByText("Regression detected")).toBeInTheDocument();
+    expect(screen.getByText(/Compared 11 case/)).toBeInTheDocument();
+    expect(screen.getByText("1 case(s) changed definition")).toBeInTheDocument();
+  });
+
+  it("report shows n/a regressed cases for an incomparable baseline", async () => {
+    mockFetch({
+      "GET /evaluations/runs": { items: [run(2), run(1)], total: 2, limit: 200, offset: 0 },
+      "GET /evaluations/runs/2/report": { ...report("not_ready"), comparison: incomparable },
+    });
+    renderAt("/reports?run=2&baseline=1");
+    await screen.findByTestId("verdict");
+    expect(screen.getByText("Regressed cases").nextElementSibling).toHaveTextContent("n/a");
+    expect(screen.getByText("Baseline not comparable")).toBeInTheDocument();
   });
 });
 

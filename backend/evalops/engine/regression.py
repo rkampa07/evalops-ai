@@ -1,4 +1,9 @@
-"""Compare a baseline run against a candidate run on the same dataset."""
+"""Compare a baseline run against a candidate run on the same dataset.
+
+The caller decides which cases are comparable (same definition in both runs) and which
+run-level incompatibilities exist (scoring config, methodology). This module never reports a
+regression for cases or runs that are not comparable.
+"""
 
 from __future__ import annotations
 
@@ -61,14 +66,59 @@ def _metric_status(
     return round(delta, 6), status
 
 
+CASE_CHANGE_KINDS = (
+    "regressed",
+    "fixed",
+    "f1_drop",
+    "unchanged_pass",
+    "unchanged_fail",
+    "only_in_baseline",
+    "only_in_candidate",
+    "definition_changed",
+    "definition_unknown",
+)
+
+
 def compare_runs(
     baseline_summary: dict[str, Any],
     candidate_summary: dict[str, Any],
     baseline_cases: dict[str, CaseSnapshot],
     candidate_cases: dict[str, CaseSnapshot],
     cfg: CompareConfig | None = None,
+    *,
+    excluded: dict[str, str] | None = None,
+    issues: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
+    """Compare two runs.
+
+    `baseline_summary`/`candidate_summary` must be aggregated over the comparable cases only.
+    `excluded` maps case keys present in both runs to "definition_changed" or
+    "definition_unknown"; those cases are listed but never counted as regressions.
+    `issues` with severity "error" make the runs incomparable: no regression is claimed.
+    """
     cfg = cfg or CompareConfig()
+    excluded = excluded or {}
+    issues = list(issues or [])
+    counts: dict[str, int] = dict.fromkeys(CASE_CHANGE_KINDS, 0)
+    config_out = {
+        "metric_tolerance": cfg.metric_tolerance,
+        "latency_tolerance_pct": cfg.latency_tolerance_pct,
+        "case_f1_drop_threshold": cfg.case_f1_drop_threshold,
+    }
+    comparable_keys = (set(baseline_cases) & set(candidate_cases)) - set(excluded)
+    if any(i["severity"] == "error" for i in issues):
+        # Incomparable runs: report why, and make no claim about regressions either way.
+        return {
+            "compatible": False,
+            "compatibility_issues": issues,
+            "comparable_cases": 0,
+            "has_regression": False,
+            "regression_reasons": [],
+            "metric_deltas": [],
+            "case_counts": counts,
+            "case_changes": [],
+            "config": config_out,
+        }
 
     metric_deltas = []
     for key, direction, kind in TRACKED_METRICS:
@@ -86,15 +136,6 @@ def compare_runs(
         )
 
     case_changes = []
-    counts: dict[str, int] = {
-        "regressed": 0,
-        "fixed": 0,
-        "f1_drop": 0,
-        "unchanged_pass": 0,
-        "unchanged_fail": 0,
-        "only_in_baseline": 0,
-        "only_in_candidate": 0,
-    }
     for key in sorted(set(baseline_cases) | set(candidate_cases)):
         b, c = baseline_cases.get(key), candidate_cases.get(key)
         f1_delta = None
@@ -102,6 +143,8 @@ def compare_runs(
             change = "only_in_candidate"
         elif c is None:
             change = "only_in_baseline"
+        elif key in excluded:
+            change = excluded[key]
         else:
             if b.token_f1 is not None and c.token_f1 is not None:
                 f1_delta = round(c.token_f1 - b.token_f1, 6)
@@ -135,14 +178,13 @@ def compare_runs(
             reasons.append(f"{d['metric']} regressed: {d['baseline']} -> {d['candidate']}")
 
     return {
+        "compatible": True,
+        "compatibility_issues": issues,
+        "comparable_cases": len(comparable_keys),
         "has_regression": bool(reasons),
         "regression_reasons": reasons,
         "metric_deltas": metric_deltas,
         "case_counts": counts,
         "case_changes": case_changes,
-        "config": {
-            "metric_tolerance": cfg.metric_tolerance,
-            "latency_tolerance_pct": cfg.latency_tolerance_pct,
-            "case_f1_drop_threshold": cfg.case_f1_drop_threshold,
-        },
+        "config": config_out,
     }

@@ -20,7 +20,8 @@ flowchart LR
 |---|---|
 | Datasets and test cases | CRUD, bulk import, per-case checks: reference answer, required terms, forbidden terms, JSON Schema, latency limit, tags |
 | Scoring | Normalized exact match, token precision/recall/F1, term checks, JSON Schema validation, latency limits, pass rates overall and per tag |
-| Comparison | Aggregate metric deltas with tolerances, per-case `regressed` / `fixed` / `f1_drop` classification |
+| Comparison | Compatibility checks first (same scoring config, methodology version and per-case definitions), then aggregate metric deltas over comparable cases and per-case `regressed` / `fixed` / `f1_drop` classification. Incomparable runs are reported as such, never as regressions |
+| Versioning | Dataset and test-case versions with definition hashes; each result snapshots the definition it was scored against; runs record the scoring-methodology version |
 | Release gates | Configurable thresholds; comparison gates **fail closed** when no baseline is supplied |
 | Reports | Readiness verdict, gate table, regression summary, failing cases; JSON or Markdown |
 | UI | Overview, datasets, new evaluation, run history, run detail, compare, release reports |
@@ -97,7 +98,8 @@ make check    # both
 ```
 
 - **Golden-score regression tests** pin the engine's exact output on the committed fixtures, so an accidental change to the methodology fails CI.
-- A migration test fails if ORM models drift from the Alembic migrations.
+- A migration test fails if ORM models drift from the Alembic migrations, and another upgrades a legacy database to verify existing data is preserved and backfilled.
+- Regression tests in `tests/regression/test_comparison_validity.py` reproduce two former bugs (config changes and dataset edits misreported as model regressions).
 - Pytest treats warnings as errors.
 
 ## Project layout

@@ -35,6 +35,8 @@ export const run = (id: number, over: Partial<Run> = {}): Run => ({
   config: { min_token_f1: 0.5, require_exact_match: false, case_sensitive: false, default_max_latency_ms: 2500 },
   summary: summary(),
   pass_rate: 8 / 12,
+  methodology_version: "1.1.0",
+  dataset_version: 2,
   created_at: "2026-10-13T20:00:00",
   ...over,
 });
@@ -43,6 +45,7 @@ export const dataset: Dataset = {
   id: 1,
   name: "kestrel-support-v1",
   description: "demo",
+  version: 2,
   created_at: "2026-10-13T20:00:00",
   updated_at: "2026-10-13T20:00:00",
   test_case_count: 12,
@@ -53,13 +56,16 @@ export const comparison: Comparison = {
   dataset_id: 1,
   baseline: { id: 1, model_name: "model-1", prompt_version: "v1.3", label: "", created_at: "2026-10-13T20:00:00" },
   candidate: { id: 2, model_name: "model-2", prompt_version: "v1.4", label: "", created_at: "2026-10-13T20:00:00" },
+  compatible: true,
+  compatibility_issues: [],
+  comparable_cases: 12,
   has_regression: true,
   regression_reasons: ["4 case(s) went from pass to fail", "pass_rate regressed: 0.916667 -> 0.666667"],
   metric_deltas: [
     { metric: "pass_rate", baseline: 0.916667, candidate: 0.666667, delta: -0.25, direction: "higher_is_better", status: "regressed" },
     { metric: "latency_p95_ms", baseline: 1659.5, candidate: 694.5, delta: -965, direction: "lower_is_better", status: "improved" },
   ],
-  case_counts: { regressed: 4, fixed: 1, f1_drop: 2, unchanged_pass: 5, unchanged_fail: 0, only_in_baseline: 0, only_in_candidate: 0 },
+  case_counts: { regressed: 4, fixed: 1, f1_drop: 2, unchanged_pass: 5, unchanged_fail: 0, only_in_baseline: 0, only_in_candidate: 0, definition_changed: 0, definition_unknown: 0 },
   case_changes: [
     {
       case_key: "safety-unauthorized-compensation",
@@ -83,6 +89,23 @@ export const comparison: Comparison = {
     },
   ],
   config: { metric_tolerance: 0.02, latency_tolerance_pct: 0.2, case_f1_drop_threshold: 0.15 },
+};
+
+export const incomparable: Comparison = {
+  ...comparison,
+  compatible: false,
+  compatibility_issues: [
+    {
+      severity: "error",
+      kind: "scoring_config",
+      message: "runs were scored with different scoring configs (min_token_f1: 0.3 -> 0.6)",
+    },
+  ],
+  comparable_cases: 0,
+  has_regression: false,
+  regression_reasons: [],
+  metric_deltas: [],
+  case_changes: [],
 };
 
 export const report = (readiness: "ready" | "not_ready"): Report => ({

@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from . import __version__
@@ -60,6 +61,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         return await call_next(request)
 
+    # Added last so it runs first: reject unexpected Host headers (DNS rebinding) before
+    # any other processing. A "*" entry is never accepted from configuration.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts or ["localhost"])
     app.include_router(health.router)
     app.include_router(datasets.router)
     app.include_router(evaluations.router)

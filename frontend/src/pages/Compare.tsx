@@ -14,17 +14,58 @@ const CHANGE_TONE: Record<CaseChangeKind, "good" | "bad" | "warn" | "neutral"> =
   unchanged_fail: "warn",
   only_in_baseline: "neutral",
   only_in_candidate: "neutral",
+  definition_changed: "warn",
+  definition_unknown: "warn",
 };
-const CHANGE_ORDER: CaseChangeKind[] = ["regressed", "f1_drop", "unchanged_fail", "fixed", "only_in_baseline", "only_in_candidate", "unchanged_pass"];
+const CHANGE_ORDER: CaseChangeKind[] = [
+  "regressed",
+  "f1_drop",
+  "unchanged_fail",
+  "fixed",
+  "definition_changed",
+  "definition_unknown",
+  "only_in_baseline",
+  "only_in_candidate",
+  "unchanged_pass",
+];
+
+export function CompatibilityIssues({ c }: { c: Comparison }) {
+  if (c.compatibility_issues.length === 0) return null;
+  return (
+    <ul className="issues">
+      {c.compatibility_issues.map((i) => (
+        <li key={i.kind + i.message}>
+          <Badge tone={i.severity === "error" ? "bad" : "warn"}>{i.severity}</Badge> {i.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function ComparisonView({ c }: { c: Comparison }) {
+  if (!c.compatible) {
+    return (
+      <Card>
+        <div className="verdict verdict-warn" data-testid="compare-verdict">
+          Not comparable: no regression verdict
+        </div>
+        <p>
+          These runs can't be compared fairly, so EvalOps makes no claim either way. Re-run the baseline with the same scoring
+          config and dataset version as the candidate.
+        </p>
+        <CompatibilityIssues c={c} />
+      </Card>
+    );
+  }
   const changes = [...c.case_changes].sort((a, b) => CHANGE_ORDER.indexOf(a.change) - CHANGE_ORDER.indexOf(b.change));
   return (
     <>
       <Card>
-        <div className={`verdict ${c.has_regression ? "verdict-bad" : "verdict-good"}`}>
+        <div className={`verdict ${c.has_regression ? "verdict-bad" : "verdict-good"}`} data-testid="compare-verdict">
           {c.has_regression ? "Regression detected" : "No regression detected"}
         </div>
+        <p className="muted small">Compared {c.comparable_cases} case(s) whose definitions are identical in both runs.</p>
+        <CompatibilityIssues c={c} />
         {c.regression_reasons.length > 0 && (
           <ul>
             {c.regression_reasons.map((r) => (

@@ -80,3 +80,20 @@ def test_no_gates_rejected():
 def test_default_policy_is_strict_on_safety():
     assert DEFAULT_RELEASE_POLICY.max_forbidden_violations == 0
     assert DEFAULT_RELEASE_POLICY.max_regressed_cases == 0
+
+
+def test_incomparable_baseline_fails_comparison_gates_closed():
+    incomparable = {
+        "compatible": False,
+        "compatibility_issues": [
+            {"severity": "error", "kind": "scoring_config", "message": "configs differ"}
+        ],
+        "metric_deltas": [],
+        "case_counts": {"regressed": 0},
+    }
+    r = evaluate_gates(SUMMARY, GateConfig(min_pass_rate=0.5, max_regressed_cases=0), incomparable)
+    g = by_gate(r)
+    assert g["min_pass_rate"]["status"] == "pass"
+    assert g["max_regressed_cases"]["status"] == "fail"
+    assert "not comparable" in g["max_regressed_cases"]["message"]
+    assert r["decision"] == "fail"

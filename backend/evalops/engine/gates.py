@@ -5,6 +5,9 @@ Policy:
   has a schema) is "skipped" and does not block the release.
 - A comparison gate configured without a baseline fails closed. A release gate must never
   pass silently because the data it needed was missing.
+- A comparison gate fails closed when the baseline is not comparable (different scoring
+  config, incompatible methodology, or no case with an identical definition). That is reported
+  as "not comparable", never as a regression.
 - The decision is "pass" only if no gate failed.
 """
 
@@ -69,7 +72,15 @@ def evaluate_gates(
         raise ValueError("at least one gate must be configured")
 
     comparison_values: dict[str, float] = {}
-    if comparison is not None:
+    incomparable_reason = None
+    if comparison is not None and not comparison.get("compatible", True):
+        errors = [
+            i["message"]
+            for i in comparison.get("compatibility_issues", [])
+            if i["severity"] == "error"
+        ]
+        incomparable_reason = "baseline not comparable: " + "; ".join(errors)
+    elif comparison is not None:
         pr = next(d for d in comparison["metric_deltas"] if d["metric"] == "pass_rate")
         if pr["baseline"] is not None and pr["candidate"] is not None:
             comparison_values["pass_rate_drop"] = round(
@@ -92,6 +103,11 @@ def evaluate_gates(
                         "fail",
                         "requires a baseline run; failing closed",
                     )
+                )
+                continue
+            if incomparable_reason is not None:
+                results.append(
+                    _result(name, key, comparator, threshold, None, "fail", incomparable_reason)
                 )
                 continue
             actual = comparison_values.get(key)

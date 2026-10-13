@@ -47,8 +47,8 @@ def session_scope(factory: sessionmaker[Session]) -> Iterator[Session]:
         session.close()
 
 
-def run_migrations(database_url: str) -> None:
-    """Apply all Alembic migrations up to head."""
+def run_migrations(database_url: str, revision: str = "head") -> None:
+    """Apply Alembic migrations up to `revision` (default: head)."""
     from alembic import command
     from alembic.config import Config
 
@@ -56,4 +56,4 @@ def run_migrations(database_url: str) -> None:
     cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
     cfg.set_main_option("sqlalchemy.url", database_url)
     cfg.attributes["configure_logger"] = False
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, revision)

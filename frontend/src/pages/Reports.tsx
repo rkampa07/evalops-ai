@@ -5,6 +5,7 @@ import type { GateConfig, GateEvaluation, GateResult } from "../api/types";
 import { Badge, Card, Empty, ErrorBanner, Loading, PageHeader, Stat } from "../components/ui";
 import { dateTime, ms, num, pct } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { CompatibilityIssues } from "./Compare";
 import { RunPicker } from "./RunPicker";
 
 const GATE_FIELDS: { key: keyof GateConfig; label: string; hint: string; needsBaseline?: boolean }[] = [
@@ -187,7 +188,12 @@ export function Reports() {
             <div className="stat-grid">
               <Stat label="Gates passed" value={`${rep.gate_evaluation.passed_gates}/${rep.gate_evaluation.gates.length}`} tone={rep.gate_evaluation.failed_gates ? "bad" : "good"} />
               <Stat label="Pass rate" value={pct(rep.run.summary.pass_rate)} hint={`${rep.run.summary.passed_cases}/${rep.run.summary.total_cases}`} />
-              <Stat label="Regressed cases" value={rep.comparison ? rep.comparison.case_counts.regressed : "n/a"} tone={rep.comparison ? (rep.comparison.case_counts.regressed ? "bad" : "good") : undefined} />
+              <Stat
+                label="Regressed cases"
+                value={rep.comparison?.compatible ? rep.comparison.case_counts.regressed : "n/a"}
+                hint={rep.comparison && !rep.comparison.compatible ? "baseline not comparable" : undefined}
+                tone={rep.comparison?.compatible ? (rep.comparison.case_counts.regressed ? "bad" : "good") : undefined}
+              />
               <Stat label="p95 latency" value={ms(rep.run.summary.latency_p95_ms)} />
             </div>
           </Card>
@@ -196,7 +202,15 @@ export function Reports() {
           </Card>
           {rep.comparison && (
             <Card title="Regression summary" actions={<Link to={`/compare?baseline=${rep.comparison.baseline.id}&candidate=${rep.run.id}`}>Full comparison →</Link>}>
-              {rep.comparison.has_regression ? (
+              {!rep.comparison.compatible ? (
+                <>
+                  <p>
+                    <strong>Baseline not comparable</strong>: regression detection was not performed and comparison gates failed
+                    closed.
+                  </p>
+                  <CompatibilityIssues c={rep.comparison} />
+                </>
+              ) : rep.comparison.has_regression ? (
                 <ul>
                   {rep.comparison.regression_reasons.map((r) => (
                     <li key={r}>{r}</li>
