@@ -20,6 +20,7 @@ class Settings:
     database_url: str = DEFAULT_DB_URL
     cors_origins: list[str] = field(default_factory=lambda: DEFAULT_CORS.split(","))
     auto_migrate: bool = True
+    max_body_bytes: int = 10 * 1024 * 1024
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -28,4 +29,5 @@ class Settings:
             database_url=os.environ.get("EVALOPS_DATABASE_URL", DEFAULT_DB_URL),
             cors_origins=[o.strip() for o in origins.split(",") if o.strip() and o.strip() != "*"],
             auto_migrate=_bool(os.environ.get("EVALOPS_AUTO_MIGRATE", "true")),
+            max_body_bytes=int(os.environ.get("EVALOPS_MAX_BODY_BYTES", 10 * 1024 * 1024)),
         )

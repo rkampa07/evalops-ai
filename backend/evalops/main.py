@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import __version__
 from .api import datasets, evaluations, health
@@ -45,6 +46,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Content-Type"],
     )
     register_error_handlers(app)
+
+    @app.middleware("http")
+    async def limit_body_size(request: Request, call_next):
+        # Reject oversized payloads before parsing; protects memory on small machines.
+        length = request.headers.get("content-length")
+        if length is not None and (not length.isdigit() or int(length) > settings.max_body_bytes):
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "error": {"code": "payload_too_large", "message": "request body too large"}
+                },
+            )
+        return await call_next(request)
+
     app.include_router(health.router)
     app.include_router(datasets.router)
     app.include_router(evaluations.router)

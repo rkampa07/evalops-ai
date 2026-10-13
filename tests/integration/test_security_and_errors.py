@@ -66,6 +66,18 @@ def test_malformed_json_body(client):
     assert r.status_code == 422 and r.json()["error"]["code"] == "validation_error"
 
 
+def test_request_body_size_limit(db_url):
+    from fastapi.testclient import TestClient
+
+    from evalops.main import create_app
+
+    app = create_app(Settings(database_url=db_url, cors_origins=[], max_body_bytes=200))
+    with TestClient(app) as c:
+        r = c.post("/datasets", json={"name": "x", "description": "y" * 500})
+        assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large"
+        assert c.post("/datasets", json={"name": "ok"}).status_code == 201
+
+
 def test_oversized_output_rejected(client, seeded):
     body = {
         "dataset_id": seeded["dataset"]["id"],
