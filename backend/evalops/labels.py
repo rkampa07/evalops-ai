@@ -31,6 +31,8 @@ COLUMNS = [
     "Notes",
     "Review Status",
 ]
+# Optional read-only context columns (e.g. from an AI pre-screen). Import never reads them.
+HINT_COLUMNS = ["Priority", "AI Suggested Label (not imported)", "AI Hint (not imported)"]
 LABELS = ("supported", "unsupported", "not_a_claim")
 UNREVIEWED, REVIEWED = "Unreviewed", "Reviewed"
 
@@ -76,6 +78,31 @@ def save_items(path: Path, items: list[dict[str, Any]]) -> None:
     os.replace(tmp, path)
 
 
+# ---------------------------------------------------------------- hints
+
+
+@dataclass(frozen=True)
+class Hint:
+    suggested_label: str
+    note: str
+    flagged: bool
+
+
+def load_hints(path: Path) -> dict[str, Hint]:
+    """Read AI pre-screen columns keyed by Claim ID: "AI Suggested Label", "AI Review Notes",
+    "AI Review Flag" (any non-empty flag counts). Used only as reviewing context."""
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        return {
+            row["Claim ID"].strip(): Hint(
+                (row.get("AI Suggested Label") or "").strip(),
+                (row.get("AI Review Notes") or "").strip(),
+                bool((row.get("AI Review Flag") or "").strip()),
+            )
+            for row in reader
+        }
+
+
 # ---------------------------------------------------------------- export
 
 
@@ -93,7 +120,15 @@ def export_csv(
     out: Path,
     *,
     force: bool = False,
+    hints: Mapping[str, Hint] | None = None,
 ) -> None:
+    """Write the review CSV. With `hints`, flagged rows come first and read-only hint columns
+    are appended; the reviewer's columns are still pre-filled from the label file only."""
+    if hints:
+        unknown = sorted(set(hints) - {i["id"] for i in items})
+        if unknown:
+            raise ValueError(f"hints reference unknown Claim IDs: {unknown}")
+        items = sorted(items, key=lambda i: not (i["id"] in hints and hints[i["id"]].flagged))
     if out.exists() and not force:
         raise FileExistsError(
             f"{out} already exists and may contain your edits; import it first or pass --force"
@@ -101,11 +136,21 @@ def export_csv(
     out.parent.mkdir(parents=True, exist_ok=True)
     # utf-8-sig adds a BOM so Excel opens the file as UTF-8; Google Sheets ignores it.
     with out.open("w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=COLUMNS, quoting=csv.QUOTE_MINIMAL)
+        fields = COLUMNS + (HINT_COLUMNS if hints is not None else [])
+        writer = csv.DictWriter(f, fieldnames=fields, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
         for item in items:
+            extra = {}
+            if hints is not None:
+                hint = hints.get(item["id"])
+                extra = {
+                    "Priority": "1 - flagged" if hint and hint.flagged else "2",
+                    "AI Suggested Label (not imported)": hint.suggested_label if hint else "",
+                    "AI Hint (not imported)": hint.note if hint else "",
+                }
             writer.writerow(
-                {
+                extra
+                | {
                     "Claim ID": item["id"],
                     "Source Passage": "\n".join(
                         f"[{pid}] {passages[pid]['text']}" for pid in item["passage_ids"]

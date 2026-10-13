@@ -218,3 +218,71 @@ def test_save_and_load_roundtrip(tmp_path, items):
     assert lab.load_items(path) == items
     lab.save_items(path, items)
     assert lab.load_items(path) == items
+
+
+# ---------------------------------------------------------------- priority export with hints
+
+
+def hints_file(tmp_path):
+    path = tmp_path / "ai.csv"
+    cols = ["Claim ID", "AI Suggested Label", "AI Review Notes", "AI Review Flag"]
+    with path.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerow(
+            {
+                "Claim ID": "c003",
+                "AI Suggested Label": "supported",
+                "AI Review Notes": "check this one",
+                "AI Review Flag": "Needs careful human judgment",
+            }
+        )
+        w.writerow(
+            {
+                "Claim ID": "c001",
+                "AI Suggested Label": "unsupported",
+                "AI Review Notes": "generic",
+                "AI Review Flag": "",
+            }
+        )
+    return path
+
+
+def test_priority_export_orders_flagged_first_with_hint_columns(tmp_path, items):
+    hints = lab.load_hints(hints_file(tmp_path))
+    out = tmp_path / "priority.csv"
+    lab.export_csv(items, KB, out, hints=hints)
+    rows = read_csv(out)
+    assert list(rows[0])[:7] == lab.COLUMNS
+    assert list(rows[0])[7:] == lab.HINT_COLUMNS
+    assert [r["Claim ID"] for r in rows] == ["c003", "c001", "c002"]
+    assert (
+        rows[0]["Priority"] == "1 - flagged"
+        and rows[0]["AI Hint (not imported)"] == "check this one"
+    )
+    assert rows[1]["Priority"] == "2" and rows[2]["AI Suggested Label (not imported)"] == ""
+    # hints never pre-fill the reviewer's columns
+    assert rows[1]["My Label"] == "supported" and rows[1]["Review Status"] == "Unreviewed"
+
+
+def test_hint_columns_are_never_imported(tmp_path, items):
+    out = tmp_path / "priority.csv"
+    lab.export_csv(items, KB, out, hints=lab.load_hints(hints_file(tmp_path)))
+    updated, report = lab.import_csv(items, out, reviewer="Rithik")
+    assert report.imported == [] and updated == items
+    rows = read_csv(out)
+    rows[1]["Review Status"] = "Reviewed"  # c001: reviewer confirms the draft, not the AI hint
+    with out.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+    updated, report = lab.import_csv(items, out, reviewer="Rithik")
+    assert updated[0]["label"] == "supported"  # AI suggested 'unsupported'; ignored
+    assert report.imported == ["c001"]
+
+
+def test_hints_for_unknown_ids_are_reported(tmp_path, items):
+    hints = lab.load_hints(hints_file(tmp_path))
+    hints["zzz"] = lab.Hint("x", "y", True)
+    with pytest.raises(ValueError, match="zzz"):
+        lab.export_csv(items, KB, tmp_path / "p.csv", hints=hints)

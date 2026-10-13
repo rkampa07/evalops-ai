@@ -31,12 +31,16 @@ KB = ROOT / "examples/rag/kestrel_policy_kb.json"
 def export(args) -> None:
     items = lab.load_items(args.labels)
     passages = {p["passage_id"]: p for p in json.loads(args.kb.read_text())["passages"]}
+    hints = lab.load_hints(args.hints) if args.hints else None
     try:
-        lab.export_csv(items, passages, args.csv, force=args.force)
+        lab.export_csv(items, passages, args.csv, force=args.force, hints=hints)
     except FileExistsError as exc:
         sys.exit(str(exc))
     status = Counter(i["label_status"] for i in items)
-    print(f"Wrote {len(items)} rows to {args.csv.relative_to(ROOT)} ({dict(status)})")
+    print(f"Wrote {len(items)} rows to {args.csv} ({dict(status)})")
+    if hints:
+        flagged = sum(h.flagged for h in hints.values())
+        print(f"{flagged} flagged row(s) listed first; AI hint columns are read-only context.")
     print(
         "Open it in Excel or Google Sheets. For each row you have checked, set 'My Label' to "
         "supported / unsupported / not_a_claim and 'Review Status' to Reviewed. Save as CSV "
@@ -82,6 +86,12 @@ def main() -> None:
     exp = sub.add_parser("export")
     exp.add_argument("--kb", type=Path, default=KB)
     exp.add_argument("--force", action="store_true", help="overwrite an existing CSV")
+    exp.add_argument(
+        "--hints",
+        type=Path,
+        help="CSV with AI pre-screen columns (AI Suggested Label, AI Review Notes, AI Review "
+        "Flag): flagged rows first, hints shown read-only, never imported",
+    )
     exp.set_defaults(func=export)
 
     imp = sub.add_parser("import")

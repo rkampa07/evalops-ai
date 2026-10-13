@@ -24,3 +24,6 @@ frontend/coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# Personal label-review working files (hints from external tools)
+examples/rag/labels/*_priority.csv

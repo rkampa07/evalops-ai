@@ -129,6 +129,18 @@ kept, such as "I'm sorry to hear…"; excluded from the metrics below and report
        backend/.venv/bin/python backend/scripts/rag_judge.py calibrate --reviewed-only \
            --out examples/rag/calibration/llama3.2-3b_judge-v2_reviewed.json
 
+**AI pre-screens are hints, not reviews.** A CSV annotated by another AI tool (columns *AI
+Suggested Label*, *AI Review Notes*, *AI Review Flag*) can be turned into a priority review file:
+
+    backend/.venv/bin/python backend/scripts/labels_csv.py \
+        --csv examples/rag/labels/claims_review_priority.csv export --hints <ai_file.csv>
+
+Flagged rows come first, and the AI's suggestion and note appear in read-only columns marked "(not
+imported)". *My Label* is still pre-filled from the label file, every unreviewed row stays
+`Unreviewed`, and import ignores the hint columns. AI suggestions therefore can't become labels
+unless a person reviews the row. (One such pre-screen agreed with all 96 draft labels, and most of
+its notes were boilerplate. Its 17 specific flags were useful as a reading order, not as labels.)
+
 The terminal alternative, `backend/scripts/review_labels.py --reviewer "<name>"`, writes the same
 fields.
 
