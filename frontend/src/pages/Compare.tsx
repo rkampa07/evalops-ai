@@ -111,6 +111,29 @@ export function ComparisonView({ c }: { c: Comparison }) {
         </table>
       </Card>
 
+      {(c.estimated_metric_deltas?.length || c.estimated_note) && (
+        <Card className="estimated" title={<>Model-based deltas <Badge tone="warn">estimated, not part of the verdict</Badge></>}>
+          {c.estimated_metric_deltas && c.estimated_metric_deltas.length > 0 && (
+            <table className="table">
+              <tbody>
+                {c.estimated_metric_deltas.map((d) => (
+                  <tr key={d.metric}>
+                    <td>{METRIC_LABELS[d.metric] ?? d.metric}</td>
+                    <td>{formatMetric(d.metric, d.baseline)}</td>
+                    <td>{formatMetric(d.metric, d.candidate)}</td>
+                    <td>{signed(d.delta, metricKind(d.metric))}</td>
+                    <td>
+                      <Badge tone={d.status === "regressed" ? "bad" : d.status === "improved" ? "good" : "neutral"}>{d.status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {c.estimated_note && <p className="muted small">{c.estimated_note}</p>}
+        </Card>
+      )}
+
       <Card title="Per-case changes">
         <table className="table">
           <thead>

@@ -10,6 +10,8 @@ METHODOLOGY_VERSION follows semantic versioning for the *scoring rules*:
 History:
 - 1.0.0  initial methodology
 - 1.1.0  JSON Schema `pattern` evaluated with a time limit; `patternProperties` rejected
+- 1.2.0  RAG evidence checks (retrieval, citations, lexical groundedness, abstention); additive,
+         scores of non-RAG cases are unchanged
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-METHODOLOGY_VERSION = "1.1.0"
+METHODOLOGY_VERSION = "1.2.0"
 
 # Fields that determine how a response is scored. Tags and key are identity/labels, not scoring.
 DEFINITION_FIELDS = (
@@ -30,6 +32,9 @@ DEFINITION_FIELDS = (
     "json_schema",
     "max_latency_ms",
 )
+# Added in methodology 1.2.0. Hashed only when set to a non-default value, so definitions of
+# pre-existing (non-RAG) cases keep exactly the same hash.
+OPTIONAL_DEFINITION_FIELDS = {"relevant_passage_ids": [], "expect_abstain": False}
 
 
 def case_definition(case: Mapping[str, Any] | Any) -> dict[str, Any]:
@@ -38,8 +43,13 @@ def case_definition(case: Mapping[str, Any] | Any) -> dict[str, Any]:
     def get(field: str) -> Any:
         return case[field] if isinstance(case, Mapping) else getattr(case, field)
 
+    def get_optional(field: str, default: Any) -> Any:
+        if isinstance(case, Mapping):
+            return case.get(field, default)
+        return getattr(case, field, default)
+
     latency = get("max_latency_ms")
-    return {
+    definition = {
         "input": get("input"),
         "expected_output": get("expected_output"),
         "required_terms": list(get("required_terms") or []),
@@ -47,12 +57,19 @@ def case_definition(case: Mapping[str, Any] | Any) -> dict[str, Any]:
         "json_schema": get("json_schema"),
         "max_latency_ms": float(latency) if latency is not None else None,
     }
+    for field, default in OPTIONAL_DEFINITION_FIELDS.items():
+        value = get_optional(field, default)
+        value = list(value) if isinstance(default, list) else bool(value)
+        if value != default:
+            definition[field] = value
+    return definition
 
 
 def definition_hash(definition: Mapping[str, Any]) -> str:
     """SHA-256 of the canonical JSON encoding of a case definition."""
+    fields = [*DEFINITION_FIELDS, *(f for f in OPTIONAL_DEFINITION_FIELDS if f in definition)]
     canonical = json.dumps(
-        {f: definition[f] for f in DEFINITION_FIELDS},
+        {f: definition[f] for f in fields},
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
@@ -74,3 +91,11 @@ def methodology_compatibility(baseline: str, candidate: str) -> str | None:
     except ValueError:
         return "error"
     return "warning" if b[0] == c[0] else "error"
+
+
+def knowledge_base_hash(passages: Mapping[str, str]) -> str | None:
+    """SHA-256 over passage ids and texts (titles are labels). None for an empty KB."""
+    if not passages:
+        return None
+    canonical = json.dumps(sorted(passages.items()), separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

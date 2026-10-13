@@ -26,6 +26,22 @@ flowchart LR
 | Reports | Readiness verdict, gate table, regression summary, failing cases; JSON or Markdown |
 | UI | Overview, datasets, new evaluation, run history, run detail, compare, release reports |
 
+## RAG evaluation with free local models
+
+EvalOps also evaluates **retrieval-augmented assistants**. A fictional policy knowledge base (20 passages, 20 customer questions) is answered by **Qwen2.5-1.5B running locally with MLX** on an 8 GB M2. EvalOps then checks:
+
+- **Deterministic:** retrieval recall@k and MRR, citation existence and validity, claim-level lexical groundedness against the retrieved passages (with exact-number matching), and whether the assistant declines unanswerable questions.
+- **Estimated:** a separate **Llama-3.2-3B judge** grades each claim. Its verdicts are stored, compared and gated as a clearly labelled *estimated* category that never changes deterministic results.
+
+Real result: a "friendlier" candidate prompt **regressed** groundedness from 0.78 to 0.52 and invented a showroom's opening hours and UK shipping. EvalOps flagged 7 regressed cases and blocked the release.
+
+The judge's agreement with a labelled set of 96 claims was measured rather than assumed. On held-out real answers it scored κ = 0.34 (vs 0.62 overall and 0.78 held-out for the lexical heuristic), and these labels are still unreviewed drafts. Details, benchmarks (1.5B: ~80 tok/s, 1.48 GB peak; 3B judge: 2.54 GB peak) and limitations are in [docs/rag-evaluation.md](docs/rag-evaluation.md).
+
+```bash
+make rag-demo        # replays the recorded model answers and judge verdicts; no model needed
+make setup-local-ai  # optional: install MLX (~400 MB) to regenerate with local models
+```
+
 ## What it does *not* do
 
 EvalOps AI measures **lexical overlap and structural conformance**. It does **not** verify factual correctness or detect hallucinations. A fluent wrong answer can score well on token F1. Use these metrics as regression signals, and pair them with human review of failing and borderline cases. See [docs/evaluation-methodology.md](docs/evaluation-methodology.md).
@@ -125,6 +141,7 @@ docs/              architecture, methodology, customer scenario, demo script, ro
 - [Architecture](docs/architecture.md)
 - [Evaluation methodology](docs/evaluation-methodology.md)
 - [Customer scenario](docs/customer-scenario.md): Kestrel Home Goods (fictional)
+- [RAG evaluation with local models](docs/rag-evaluation.md): methodology, judge calibration, benchmarks
 - [Five-minute demo script](docs/demo-script.md)
 - [Roadmap](docs/roadmap.md)
 

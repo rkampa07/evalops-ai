@@ -88,6 +88,13 @@ Latency is **reported by the client** (`latency_ms` per response); EvalOps does 
 
 Cases with no submitted response are scored as failures (`missing_response`) and count in the pass-rate denominator. Responses referencing unknown case keys are rejected with 422 so typos can't silently drop cases.
 
+### RAG checks (methodology 1.2.0)
+
+Cases with `relevant_passage_ids` or `expect_abstain` also get retrieval, citation, lexical
+groundedness and abstention checks against the dataset's knowledge-base passages. Model-judge
+verdicts are a separate, estimated category. Full definitions, measured error rates and limitations
+are in [rag-evaluation.md](rag-evaluation.md).
+
 ## Run-level aggregates
 
 | Metric | Definition | Denominator |

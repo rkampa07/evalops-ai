@@ -50,6 +50,7 @@ export const dataset: Dataset = {
   updated_at: "2026-10-13T20:00:00",
   test_case_count: 12,
   run_count: 2,
+  passage_count: 0,
 };
 
 export const comparison: Comparison = {
@@ -158,3 +159,70 @@ export function mockFetch(routes: Record<string, unknown>) {
   vi.stubGlobal("fetch", fn);
   return { fn, calls };
 }
+
+export const ragRun = (id: number) => ({
+  ...run(id, {
+    summary: summary({
+      rag_cases: 2,
+      retrieval_recall_at_k: 1,
+      mrr: 0.75,
+      citation_validity_rate: 1,
+      groundedness: 0.5,
+      unsupported_claim_count: 1,
+      abstention_accuracy: 1,
+    }),
+    generation: {
+      model_id: "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+      model_revision: "8b403126fc14f14cfc99",
+      backend: "mlx",
+      prompt_version: "rag-v2",
+      prompt_hash: "abcdef0123456789",
+      settings: { temperature: 0, max_tokens: 256, seed: 0 },
+      retrieval: { retriever: "bm25", k: 3 },
+    },
+    model_graded: {
+      label: "estimated" as const,
+      judge: { model_id: "mlx-community/Llama-3.2-3B-Instruct-4bit", backend: "mlx", prompt_version: "judge-v2", prompt_hash: "h", settings: {} },
+      graded_cases: 1,
+      claims_total: 2,
+      claims_supported: 1,
+      claims_error: 0,
+      estimated_groundedness: 0.5,
+      estimated_unsupported_claims: 1,
+      heuristic_judge_agreement: 1,
+    },
+  }),
+  results: [
+    {
+      id: 1,
+      case_key: "q-ship-uk",
+      test_case_id: 1,
+      output: "Yes, you can ship your order to London in the UK. [KB-ORD-01]",
+      latency_ms: 900,
+      passed: false,
+      metrics: {
+        responded: true,
+        rag: true,
+        abstained: false,
+        abstention_correct: true,
+        citations: ["KB-ORD-01"],
+        groundedness: 0.5,
+        claims: [
+          { text: "Yes, you can ship your order to London in the UK.", citations: ["KB-ORD-01"], supported: false, passage_id: "KB-ORD-01", coverage: 0.4, missing_numbers: [] },
+          { text: "Orders can be cancelled within 1 hour.", citations: [], supported: true, passage_id: "KB-ORD-01", coverage: 1, missing_numbers: [] },
+        ],
+      },
+      failures: [{ check: "groundedness", message: "lexical groundedness 0.50 < 0.80" }],
+      tags: ["rag"],
+      retrieved_passage_ids: ["KB-ORD-02", "KB-RET-03", "KB-ORD-01"],
+      model_grades: {
+        label: "estimated" as const,
+        judge: { model_id: "mlx-community/Llama-3.2-3B-Instruct-4bit", backend: "mlx", prompt_version: "judge-v2", prompt_hash: "h", settings: {} },
+        claims: [
+          { claim: "Yes, you can ship your order to London in the UK.", verdict: "unsupported" as const },
+          { claim: "Orders can be cancelled within 1 hour.", verdict: "supported" as const },
+        ],
+      },
+    },
+  ],
+});

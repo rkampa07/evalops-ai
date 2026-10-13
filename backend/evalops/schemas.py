@@ -20,6 +20,11 @@ Key = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Za-z
 Term = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Za-z0-9_.:\-]{1,50}$")]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+# Passage ids double as citation markers in answers, e.g. "[KB-RET-01]" (see engine/rag.py).
+PassageId = Annotated[
+    str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,5}$")
+]
+MAX_METADATA_BYTES = 16_384
 
 MAX_TEXT = 20_000
 MAX_OUTPUT = 100_000
@@ -56,6 +61,41 @@ class DatasetOut(OrmOutput):
     updated_at: datetime
     test_case_count: int = 0
     run_count: int = 0
+    passage_count: int = 0
+
+
+# ---------------------------------------------------------------- knowledge base passages
+
+
+class PassageIn(StrictInput):
+    passage_id: PassageId
+    title: str = Field(default="", max_length=300)
+    text: str = Field(min_length=1, max_length=MAX_TEXT)
+
+
+class PassageBulkCreate(StrictInput):
+    passages: list[PassageIn] = Field(min_length=1, max_length=1000)
+
+
+class PassageUpdate(StrictInput):
+    title: str | None = Field(default=None, max_length=300)
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_TEXT)
+
+
+class PassageOut(OrmOutput):
+    passage_id: str
+    title: str
+    text: str
+    created_at: datetime
+    updated_at: datetime
+
+
+def _bounded_metadata(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    import json
+
+    if value is not None and len(json.dumps(value, default=str)) > MAX_METADATA_BYTES:
+        raise ValueError(f"metadata larger than {MAX_METADATA_BYTES} bytes")
+    return value
 
 
 # ---------------------------------------------------------------- test cases
@@ -81,9 +121,15 @@ class TestCaseBase(StrictInput):
     json_schema: dict[str, Any] | None = None
     max_latency_ms: float | None = Field(default=None, gt=0, le=MAX_LATENCY_MS)
     tags: list[Tag] = Field(default_factory=list, max_length=20)
+    # RAG: gold passages that answer the question; or the question is unanswerable from the
+    # knowledge base and the assistant should decline.
+    relevant_passage_ids: list[PassageId] = Field(default_factory=list, max_length=20)
+    expect_abstain: bool = False
 
     check_schema = field_validator("json_schema")(_validate_schema)
-    dedupe_lists = field_validator("required_terms", "forbidden_terms", "tags")(_dedupe)
+    dedupe_lists = field_validator(
+        "required_terms", "forbidden_terms", "tags", "relevant_passage_ids"
+    )(_dedupe)
 
 
 def has_any_check(data: dict[str, Any]) -> bool:
@@ -93,6 +139,8 @@ def has_any_check(data: dict[str, Any]) -> bool:
         or data.get("forbidden_terms")
         or data.get("json_schema") is not None
         or data.get("max_latency_ms") is not None
+        or data.get("relevant_passage_ids")
+        or data.get("expect_abstain")
     )
 
 
@@ -106,13 +154,16 @@ class TestCaseCreate(TestCaseBase):
         if not has_any_check(self.model_dump()):
             raise ValueError(
                 "a test case needs at least one check: expected_output, required_terms, "
-                "forbidden_terms, json_schema, or max_latency_ms"
+                "forbidden_terms, json_schema, max_latency_ms, relevant_passage_ids, or "
+                "expect_abstain"
             )
         overlap = set(map(str.casefold, self.required_terms)) & set(
             map(str.casefold, self.forbidden_terms)
         )
         if overlap:
             raise ValueError(f"terms cannot be both required and forbidden: {sorted(overlap)}")
+        if self.expect_abstain and self.relevant_passage_ids:
+            raise ValueError("a case that expects abstention cannot list relevant passages")
         return self
 
 
@@ -127,6 +178,8 @@ class TestCaseUpdate(StrictInput):
     json_schema: dict[str, Any] | None = None
     max_latency_ms: float | None = Field(default=None, gt=0, le=MAX_LATENCY_MS)
     tags: list[Tag] | None = Field(default=None, max_length=20)
+    relevant_passage_ids: list[PassageId] | None = Field(default=None, max_length=20)
+    expect_abstain: bool | None = None
 
     check_schema = field_validator("json_schema")(_validate_schema)
 
@@ -152,6 +205,8 @@ class TestCaseOut(OrmOutput):
     updated_at: datetime
     version: int
     content_hash: str
+    relevant_passage_ids: list[str] = Field(default_factory=list)
+    expect_abstain: bool = False
 
 
 # ---------------------------------------------------------------- runs
@@ -162,12 +217,19 @@ class EvalConfigIn(StrictInput):
     require_exact_match: bool = False
     case_sensitive: bool = False
     default_max_latency_ms: float | None = Field(default=None, gt=0, le=MAX_LATENCY_MS)
+    min_groundedness: float = Field(default=0.8, ge=0, le=1)
 
 
 class ResponseIn(StrictInput):
     case_key: Key
     output: str = Field(max_length=MAX_OUTPUT)
     latency_ms: float | None = Field(default=None, ge=0, le=MAX_LATENCY_MS * 10)
+    # RAG: passage ids placed in the model's context, in rank order.
+    retrieved_passage_ids: list[PassageId] | None = Field(default=None, max_length=50)
+    # Per-response generation metadata (tokens, timings, ...). Stored, not interpreted.
+    generation: dict[str, Any] | None = None
+
+    bounded = field_validator("generation")(_bounded_metadata)
 
 
 class RunCreate(StrictInput):
@@ -179,6 +241,10 @@ class RunCreate(StrictInput):
     label: str = Field(default="", max_length=200)
     config: EvalConfigIn = Field(default_factory=EvalConfigIn)
     responses: list[ResponseIn] = Field(min_length=1, max_length=5000)
+    # Run-level generation metadata: model id/revision, prompt template hash, settings, ...
+    generation: dict[str, Any] | None = None
+
+    bounded = field_validator("generation")(_bounded_metadata)
 
     @field_validator("responses")
     @classmethod
@@ -207,6 +273,9 @@ class ResultOut(OrmOutput):
     metrics: dict[str, Any]
     failures: list[Failure]
     tags: list[str]
+    retrieved_passage_ids: list[str] | None = None
+    generation: dict[str, Any] | None = None
+    model_grades: dict[str, Any] | None = None
     case_version: int | None = None
     case_hash: str | None = None
     case_snapshot: dict[str, Any] | None = None
@@ -238,6 +307,15 @@ class RunSummary(BaseModel):
     latency_max_ms: float | None
     failure_counts: dict[str, int]
     tag_pass_rates: dict[str, TagPassRate]
+    # RAG (deterministic); absent/None for runs without RAG cases or created before 1.2.0
+    rag_cases: int = 0
+    retrieval_recall_at_k: float | None = None
+    mrr: float | None = None
+    citation_validity_rate: float | None = None
+    citation_support_rate: float | None = None
+    groundedness: float | None = None
+    unsupported_claim_count: int = 0
+    abstention_accuracy: float | None = None
 
 
 class RunOut(OrmOutput):
@@ -253,6 +331,10 @@ class RunOut(OrmOutput):
     pass_rate: float | None
     methodology_version: str
     dataset_version: int | None
+    knowledge_base_hash: str | None = None
+    generation: dict[str, Any] | None = None
+    # Model-based (estimated) aggregates; never mixed into the deterministic summary.
+    model_graded: dict[str, Any] | None = None
     created_at: datetime
 
 
@@ -336,6 +418,9 @@ class ComparisonOut(BaseModel):
     case_counts: dict[str, int]
     case_changes: list[CaseChange]
     config: CompareConfigIn
+    # Model-based (estimated) deltas, kept separate and never part of has_regression.
+    estimated_metric_deltas: list[MetricDelta] = Field(default_factory=list)
+    estimated_note: str | None = None
 
 
 class GateConfigIn(StrictInput):
@@ -350,6 +435,15 @@ class GateConfigIn(StrictInput):
     max_failed_cases: int | None = Field(default=None, ge=0)
     max_pass_rate_drop: float | None = Field(default=None, ge=0, le=1)
     max_regressed_cases: int | None = Field(default=None, ge=0)
+    # RAG (deterministic)
+    min_retrieval_recall: float | None = Field(default=None, ge=0, le=1)
+    min_mrr: float | None = Field(default=None, ge=0, le=1)
+    min_citation_validity: float | None = Field(default=None, ge=0, le=1)
+    min_groundedness: float | None = Field(default=None, ge=0, le=1)
+    max_unsupported_claims: int | None = Field(default=None, ge=0)
+    min_abstention_accuracy: float | None = Field(default=None, ge=0, le=1)
+    # RAG (estimated by a local model judge; fails closed if no grades are attached)
+    min_estimated_groundedness: float | None = Field(default=None, ge=0, le=1)
 
     @model_validator(mode="after")
     def _non_empty(self) -> GateConfigIn:
@@ -405,3 +499,34 @@ class ReportOut(BaseModel):
     failing_cases: list[ResultOut]
     notes: list[str]
     markdown: str
+
+
+# ---------------------------------------------------------------- model-based grades
+
+
+class JudgeInfo(StrictInput):
+    model_id: str = Field(min_length=1, max_length=200)
+    model_revision: str | None = Field(default=None, max_length=100)
+    backend: str = Field(min_length=1, max_length=50)
+    prompt_version: str = Field(min_length=1, max_length=50)
+    prompt_hash: str = Field(min_length=1, max_length=64)
+    settings: dict[str, Any] = Field(default_factory=dict)
+
+    bounded = field_validator("settings")(_bounded_metadata)
+
+
+class ClaimGradeIn(StrictInput):
+    claim: str = Field(min_length=1, max_length=4000)
+    verdict: Literal["supported", "unsupported", "error"]
+    raw: str | None = Field(default=None, max_length=2000)
+
+
+class CaseGradeIn(StrictInput):
+    case_key: Key
+    claims: list[ClaimGradeIn] = Field(max_length=200)
+    latency_ms: float | None = Field(default=None, ge=0)
+
+
+class ModelGradesIn(StrictInput):
+    judge: JudgeInfo
+    grades: list[CaseGradeIn] = Field(min_length=1, max_length=5000)

@@ -4,6 +4,9 @@ from ..schemas import (
     DatasetCreate,
     DatasetOut,
     DatasetUpdate,
+    PassageBulkCreate,
+    PassageOut,
+    PassageUpdate,
     TestCaseBulkCreate,
     TestCaseCreate,
     TestCaseOut,
@@ -76,4 +79,31 @@ def update_test_case(case_id: int, body: TestCaseUpdate, svc: DatasetServiceDep)
 @router.delete("/test-cases/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_test_case(case_id: int, svc: DatasetServiceDep):
     svc.delete_case(case_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/datasets/{dataset_id}/passages", response_model=list[PassageOut])
+def list_passages(dataset_id: int, svc: DatasetServiceDep):
+    return svc.list_passages(dataset_id)
+
+
+@router.post(
+    "/datasets/{dataset_id}/passages",
+    response_model=list[PassageOut],
+    status_code=status.HTTP_201_CREATED,
+)
+def create_passages(dataset_id: int, body: PassageBulkCreate, svc: DatasetServiceDep):
+    return svc.create_passages(dataset_id, body.passages)
+
+
+@router.patch("/datasets/{dataset_id}/passages/{passage_id}", response_model=PassageOut)
+def update_passage(dataset_id: int, passage_id: str, body: PassageUpdate, svc: DatasetServiceDep):
+    return svc.update_passage(dataset_id, passage_id, body)
+
+
+@router.delete(
+    "/datasets/{dataset_id}/passages/{passage_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_passage(dataset_id: int, passage_id: str, svc: DatasetServiceDep):
+    svc.delete_passage(dataset_id, passage_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

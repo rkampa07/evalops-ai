@@ -22,6 +22,11 @@ TRACKED_METRICS: list[tuple[str, Direction, Literal["absolute", "relative"]]] = 
     ("schema_pass_rate", "higher_is_better", "absolute"),
     ("latency_pass_rate", "higher_is_better", "absolute"),
     ("latency_p95_ms", "lower_is_better", "relative"),
+    # RAG (deterministic)
+    ("retrieval_recall_at_k", "higher_is_better", "absolute"),
+    ("citation_validity_rate", "higher_is_better", "absolute"),
+    ("groundedness", "higher_is_better", "absolute"),
+    ("abstention_accuracy", "higher_is_better", "absolute"),
 ]
 
 

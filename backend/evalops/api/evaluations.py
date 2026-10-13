@@ -8,6 +8,7 @@ from ..schemas import (
     ComparisonOut,
     GateEvaluationOut,
     GateRequest,
+    ModelGradesIn,
     ReportOut,
     RunCreate,
     RunDetailOut,
@@ -52,6 +53,12 @@ def get_run(run_id: int, svc: EvaluationServiceDep):
 def delete_run(run_id: int, svc: EvaluationServiceDep):
     svc.delete_run(run_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/runs/{run_id}/model-grades", response_model=RunDetailOut)
+def attach_model_grades(run_id: int, body: ModelGradesIn, svc: EvaluationServiceDep):
+    """Attach claim-level verdicts from a model judge. Stored and reported as estimates."""
+    return svc.attach_model_grades(run_id, body)
 
 
 @router.get("/runs/{run_id}/report", response_model=ReportOut)

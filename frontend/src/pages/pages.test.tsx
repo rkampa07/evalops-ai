@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "../App";
-import { comparison, dataset, incomparable, mockFetch, report, run, summary } from "../test/fixtures";
+import { comparison, dataset, incomparable, mockFetch, ragRun, report, run, summary } from "../test/fixtures";
 import { parseResponses } from "./NewRun";
 
 function renderAt(path: string) {
@@ -89,6 +89,44 @@ describe("Compare compatibility", () => {
     await screen.findByTestId("verdict");
     expect(screen.getByText("Regressed cases").nextElementSibling).toHaveTextContent("n/a");
     expect(screen.getByText("Baseline not comparable")).toBeInTheDocument();
+  });
+});
+
+describe("RAG run detail", () => {
+  it("separates deterministic evidence from estimated model scores", async () => {
+    mockFetch({ "GET /evaluations/runs/7": ragRun(7) });
+    renderAt("/runs/7");
+    expect(await screen.findByText("RAG evidence")).toBeInTheDocument();
+    expect(screen.getByText("deterministic")).toBeInTheDocument();
+    expect(screen.getByText("estimated, not ground truth")).toBeInTheDocument();
+    expect(screen.getByText("Estimated groundedness").nextElementSibling).toHaveTextContent("50.0%");
+    expect(screen.getByText("Generation metadata")).toBeInTheDocument();
+    expect(screen.getByText("mlx-community/Qwen2.5-1.5B-Instruct-4bit")).toBeInTheDocument();
+  });
+
+  it("shows heuristic and judge verdicts per claim", async () => {
+    mockFetch({ "GET /evaluations/runs/7": ragRun(7) });
+    renderAt("/runs/7");
+    await userEvent.click(await screen.findByRole("button", { name: "q-ship-uk" }));
+    const row = screen.getByText("Yes, you can ship your order to London in the UK.").closest("tr")!;
+    expect(row).toHaveTextContent("unsupported");
+    expect(screen.getByText(/Retrieved: KB-ORD-02, KB-RET-03, KB-ORD-01/)).toBeInTheDocument();
+  });
+
+  it("keeps estimated deltas out of the comparison verdict", async () => {
+    mockFetch({
+      "GET /evaluations/runs": { items: [run(2), run(1)], total: 2, limit: 200, offset: 0 },
+      "GET /evaluations/compare": {
+        ...comparison,
+        estimated_metric_deltas: [
+          { metric: "estimated_groundedness", baseline: 0.44, candidate: 0.3, delta: -0.14, direction: "higher_is_better", status: "regressed" },
+        ],
+        estimated_note: "estimated by judge; not ground truth and not part of has_regression",
+      },
+    });
+    renderAt("/compare?baseline=1&candidate=2");
+    expect(await screen.findByText("estimated, not part of the verdict")).toBeInTheDocument();
+    expect(screen.getByText("Groundedness (estimated by judge)")).toBeInTheDocument();
   });
 });
 

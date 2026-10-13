@@ -24,6 +24,24 @@ flowchart TB
 
 EvalOps never calls a model. The customer's application (or a harness around it) produces outputs, and EvalOps scores them. This keeps the platform provider-agnostic, deterministic, and free to run.
 
+## Offline model tooling (RAG phase)
+
+```mermaid
+flowchart LR
+    subgraph "Offline scripts (one model per process)"
+        GEN[rag_generate.py<br/>BM25 + Qwen 1.5B via MLX]
+        JUD[rag_judge.py<br/>Llama 3B judge via MLX]
+    end
+    GEN -- response file --> DEMO[rag_demo.py] -- POST /evaluations/runs --> API[FastAPI]
+    JUD -- PUT /runs/{id}/model-grades --> API
+    API --> DB[(SQLite)]
+```
+
+`evalops/llm/` holds the model backends (MLX, imported lazily, plus a fixture backend for tests and
+replay), prompt versions and the judge. The API process never imports MLX or holds weights.
+Deterministic RAG checks live in the pure `engine/rag.py`. Model verdicts are stored in separate
+`model_grades` / `model_graded` fields. See [rag-evaluation.md](rag-evaluation.md).
+
 ## Backend layers
 
 ```mermaid
@@ -52,6 +70,7 @@ The engine is deliberately free of I/O so it is deterministic and unit-testable 
 ```mermaid
 erDiagram
     DATASET ||--o{ TEST_CASE : contains
+    DATASET ||--o{ PASSAGE : "knowledge base"
     DATASET ||--o{ EVALUATION_RUN : "evaluated by"
     EVALUATION_RUN ||--o{ EVALUATION_RESULT : produces
     TEST_CASE |o--o{ EVALUATION_RESULT : "scored as (nullable)"

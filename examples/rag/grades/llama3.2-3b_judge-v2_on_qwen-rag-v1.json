@@ -1,0 +1,205 @@
+{
+  "judge": {
+    "model_id": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+    "model_revision": "7f0dc925e0d0afb0322d96f9255cfddf2ba5636e",
+    "backend": "mlx",
+    "prompt_version": "judge-v2",
+    "prompt_hash": "92cdf55b31a66c4f6c484ba492e3e6c801b8d5291750822d68883a09c0a03afe",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 4,
+      "seed": 0
+    }
+  },
+  "grades": [
+    {
+      "case_key": "q-cancel-order",
+      "claims": [
+        {
+          "claim": "Yes, you can cancel your order within 1 hour of purchase from the Orders page.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "After that, contact support; changes are not guaranteed once an order ships.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2301.9
+    },
+    {
+      "case_key": "q-card-in-chat",
+      "claims": [
+        {
+          "claim": "No, you cannot give me your card number in the chat to pay.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 1008.2
+    },
+    {
+      "case_key": "q-damaged-dresser",
+      "claims": [
+        {
+          "claim": "No, for damaged large furniture, a carrier inspection may be scheduled within 3 business days before a replacement ships.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1002.2
+    },
+    {
+      "case_key": "q-damaged-lamp",
+      "claims": [
+        {
+          "claim": "You should upload a photo of the damaged lamp on the Orders page within 14 days of delivery.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1085.1
+    },
+    {
+      "case_key": "q-led-bulb",
+      "claims": [
+        {
+          "claim": "The LED bulb you bought separately is covered for 90 days under the warranty.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 998.4
+    },
+    {
+      "case_key": "q-opened-mattress",
+      "claims": [
+        {
+          "claim": "No, you cannot return a mattress that has been opened.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1005.8
+    },
+    {
+      "case_key": "q-pet-damage",
+      "claims": [
+        {
+          "claim": "No, the warranty does not cover normal wear, misuse, or accidental damage.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1002.7
+    },
+    {
+      "case_key": "q-price-drop",
+      "claims": [
+        {
+          "claim": "Yes, you can request a price adjustment for the difference.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1001.3
+    },
+    {
+      "case_key": "q-refund-timing",
+      "claims": [
+        {
+          "claim": "The policy states that refunds are issued within 5 business days after the returned item arrives at our warehouse.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 1088.6
+    },
+    {
+      "case_key": "q-return-fee",
+      "claims": [
+        {
+          "claim": "No, you do not have to pay for return shipping on a $60 order.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1086.6
+    },
+    {
+      "case_key": "q-return-window",
+      "claims": [
+        {
+          "claim": "You have 30 days to return a sofa you bought.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1003.9
+    },
+    {
+      "case_key": "q-rewards-points",
+      "claims": [
+        {
+          "claim": "You need 500 Rewards points to redeem a $10 reward.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 1089.2
+    },
+    {
+      "case_key": "q-ship-canada",
+      "claims": [
+        {
+          "claim": "Yes, we ship to Canada.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Orders to Canada usually arrive in 7 to 12 business days.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2022.2
+    },
+    {
+      "case_key": "q-warranty-claim",
+      "claims": [
+        {
+          "claim": "To file a warranty claim for a wobbly chair, you should contact support with your order number and provide photos of the wobbly part.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Approved claims will receive a repair kit, a replacement part, or a replacement item.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2097.2
+    },
+    {
+      "case_key": "q-white-glove",
+      "claims": [
+        {
+          "claim": "The white-glove delivery option for a bookshelf is available for a $129 fee.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1003.2
+    }
+  ],
+  "graded_run": {
+    "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "prompt_version": "rag-v1"
+  },
+  "benchmark": {
+    "model_load_seconds": 1.82,
+    "total_seconds": 18.82,
+    "claims": 18
+  }
+}

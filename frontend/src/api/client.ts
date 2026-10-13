@@ -2,6 +2,7 @@ import type {
   Comparison,
   Dataset,
   GateConfig,
+  Passage,
   GateEvaluation,
   Report,
   RunCreate,
@@ -75,6 +76,7 @@ export const api = {
     request<Dataset>("PATCH", `/datasets/${id}`, body),
   deleteDataset: (id: number) => request<void>("DELETE", `/datasets/${id}`),
 
+  listPassages: (datasetId: number) => request<Passage[]>("GET", `/datasets/${datasetId}/passages`),
   listTestCases: (datasetId: number) => request<TestCase[]>("GET", `/datasets/${datasetId}/test-cases`),
   createTestCase: (datasetId: number, body: TestCaseInput) =>
     request<TestCase>("POST", `/datasets/${datasetId}/test-cases`, body),

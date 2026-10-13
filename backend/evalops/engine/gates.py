@@ -33,6 +33,15 @@ class GateConfig:
     # Comparison gates: need a baseline run
     max_pass_rate_drop: float | None = None
     max_regressed_cases: int | None = None
+    # RAG (deterministic)
+    min_retrieval_recall: float | None = None
+    min_mrr: float | None = None
+    min_citation_validity: float | None = None
+    min_groundedness: float | None = None
+    max_unsupported_claims: int | None = None
+    min_abstention_accuracy: float | None = None
+    # RAG (estimated by a model judge)
+    min_estimated_groundedness: float | None = None
 
     def configured(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -51,6 +60,27 @@ _GATE_SPECS: dict[str, tuple[str, Comparator, bool]] = {
     "max_failed_cases": ("failed_cases", "<=", False),
     "max_pass_rate_drop": ("pass_rate_drop", "<=", True),
     "max_regressed_cases": ("regressed_cases", "<=", True),
+    "min_retrieval_recall": ("retrieval_recall_at_k", ">=", False),
+    "min_mrr": ("mrr", ">=", False),
+    "min_citation_validity": ("citation_validity_rate", ">=", False),
+    "min_groundedness": ("groundedness", ">=", False),
+    "max_unsupported_claims": ("unsupported_claim_count", "<=", False),
+    "min_abstention_accuracy": ("abstention_accuracy", ">=", False),
+    "min_estimated_groundedness": ("estimated_groundedness", ">=", False),
+}
+
+# Gates whose data must be produced separately; missing data fails closed instead of skipping.
+_FAIL_IF_MISSING = {
+    "min_estimated_groundedness": "no model-based grades attached to this run; failing closed",
+}
+
+# Applied by the report endpoint when the run contains RAG cases. Chosen before any model
+# output was generated (see docs/rag-evaluation.md).
+DEFAULT_RAG_POLICY = {
+    "min_retrieval_recall": 0.8,
+    "min_citation_validity": 1.0,
+    "min_groundedness": 0.8,
+    "min_abstention_accuracy": 1.0,
 }
 
 DEFAULT_RELEASE_POLICY = GateConfig(
@@ -114,6 +144,11 @@ def evaluate_gates(
         else:
             actual = summary.get(key)
 
+        if actual is None and name in _FAIL_IF_MISSING:
+            results.append(
+                _result(name, key, comparator, threshold, None, "fail", _FAIL_IF_MISSING[name])
+            )
+            continue
         if actual is None:
             results.append(
                 _result(

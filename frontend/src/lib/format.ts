@@ -36,6 +36,11 @@ export const METRIC_LABELS: Record<string, string> = {
   schema_pass_rate: "JSON schema pass rate",
   latency_pass_rate: "Latency pass rate",
   latency_p95_ms: "Latency p95",
+  retrieval_recall_at_k: "Retrieval recall@k",
+  citation_validity_rate: "Citation validity",
+  groundedness: "Groundedness (lexical)",
+  abstention_accuracy: "Abstention accuracy",
+  estimated_groundedness: "Groundedness (estimated by judge)",
 };
 
 export function metricKind(metric: string): "rate" | "ms" | "score" {

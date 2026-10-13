@@ -1,0 +1,555 @@
+{
+  "generated_at": "2026-10-13T22:02:53+00:00",
+  "labels_file": "examples/rag/labels/claims.jsonl",
+  "label_status_counts": {
+    "draft": 40
+  },
+  "labels_are_reviewed": false,
+  "label_counts": {
+    "supported": 20,
+    "unsupported": 20
+  },
+  "positive_class": "unsupported",
+  "results": {
+    "heuristic": {
+      "all": {
+        "n": 40,
+        "positive_class": "unsupported",
+        "tp": 11,
+        "fp": 2,
+        "fn": 9,
+        "tn": 18,
+        "precision": 0.846154,
+        "precision_ci95": [
+          0.5776,
+          0.9567
+        ],
+        "recall": 0.55,
+        "recall_ci95": [
+          0.3421,
+          0.7418
+        ],
+        "f1": 0.666667,
+        "accuracy": 0.725,
+        "accuracy_ci95": [
+          0.5716,
+          0.8389
+        ],
+        "cohen_kappa": 0.45
+      },
+      "constructed": {
+        "n": 40,
+        "positive_class": "unsupported",
+        "tp": 11,
+        "fp": 2,
+        "fn": 9,
+        "tn": 18,
+        "precision": 0.846154,
+        "precision_ci95": [
+          0.5776,
+          0.9567
+        ],
+        "recall": 0.55,
+        "recall_ci95": [
+          0.3421,
+          0.7418
+        ],
+        "f1": 0.666667,
+        "accuracy": 0.725,
+        "accuracy_ci95": [
+          0.5716,
+          0.8389
+        ],
+        "cohen_kappa": 0.45
+      },
+      "generated": {
+        "n": 0,
+        "positive_class": "unsupported",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "precision": null,
+        "precision_ci95": [
+          null,
+          null
+        ],
+        "recall": null,
+        "recall_ci95": [
+          null,
+          null
+        ],
+        "f1": null,
+        "accuracy": null,
+        "accuracy_ci95": [
+          null,
+          null
+        ],
+        "cohen_kappa": null
+      }
+    },
+    "judge": {
+      "all": {
+        "n": 40,
+        "positive_class": "unsupported",
+        "tp": 20,
+        "fp": 8,
+        "fn": 0,
+        "tn": 12,
+        "precision": 0.714286,
+        "precision_ci95": [
+          0.5294,
+          0.8475
+        ],
+        "recall": 1.0,
+        "recall_ci95": [
+          0.8389,
+          1.0
+        ],
+        "f1": 0.833334,
+        "accuracy": 0.8,
+        "accuracy_ci95": [
+          0.6524,
+          0.895
+        ],
+        "cohen_kappa": 0.6
+      },
+      "constructed": {
+        "n": 40,
+        "positive_class": "unsupported",
+        "tp": 20,
+        "fp": 8,
+        "fn": 0,
+        "tn": 12,
+        "precision": 0.714286,
+        "precision_ci95": [
+          0.5294,
+          0.8475
+        ],
+        "recall": 1.0,
+        "recall_ci95": [
+          0.8389,
+          1.0
+        ],
+        "f1": 0.833334,
+        "accuracy": 0.8,
+        "accuracy_ci95": [
+          0.6524,
+          0.895
+        ],
+        "cohen_kappa": 0.6
+      },
+      "generated": {
+        "n": 0,
+        "positive_class": "unsupported",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "precision": null,
+        "precision_ci95": [
+          null,
+          null
+        ],
+        "recall": null,
+        "recall_ci95": [
+          null,
+          null
+        ],
+        "f1": null,
+        "accuracy": null,
+        "accuracy_ci95": [
+          null,
+          null
+        ],
+        "cohen_kappa": null
+      }
+    }
+  },
+  "not_a_claim_items": {
+    "heuristic": {},
+    "judge": {}
+  },
+  "items": [
+    {
+      "id": "c001",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c002",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c003",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c004",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c005",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c006",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c007",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c008",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c009",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c010",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c011",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c012",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c013",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c014",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c015",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c016",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c017",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c018",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c019",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c020",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c021",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c022",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c023",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c024",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c025",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c026",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c027",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c028",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c029",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c030",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c031",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c032",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c033",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c034",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c035",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c036",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "unsupported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c037",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c038",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    },
+    {
+      "id": "c039",
+      "source": "constructed",
+      "label": "supported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "supported",
+      "judge_raw": "SUPPORTED"
+    },
+    {
+      "id": "c040",
+      "source": "constructed",
+      "label": "unsupported",
+      "label_status": "draft",
+      "heuristic": "supported",
+      "judge": "unsupported",
+      "judge_raw": "UNSUPPORTED"
+    }
+  ],
+  "judge": {
+    "model_id": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+    "model_revision": "7f0dc925e0d0afb0322d96f9255cfddf2ba5636e",
+    "backend": "mlx",
+    "prompt_version": "judge-v2",
+    "prompt_hash": "92cdf55b31a66c4f6c484ba492e3e6c801b8d5291750822d68883a09c0a03afe",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 4,
+      "seed": 0
+    }
+  },
+  "subset": "constructed",
+  "judge_errors": 0,
+  "benchmark": {
+    "model_load_seconds": 1.84,
+    "judgments": 40,
+    "latency_ms_median": 844.9,
+    "latency_ms_max": 1137.5
+  }
+}

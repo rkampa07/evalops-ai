@@ -16,8 +16,10 @@ Ordered by customer value per unit of effort. Items marked **(semantic)** would 
 - **Statistical confidence**: bootstrap confidence intervals on pass rate and F1. Flag comparisons where the dataset is too small to separate a real regression from noise.
 - **Additional deterministic checks**: regex checks, numeric tolerance ("refund amount within ±1%"), citation/URL allow-lists, length limits, PII pattern detection (emails, card-number shapes).
 - **Pluggable runners (optional)**: adapters that call a model endpoint to *generate* responses, behind an explicit opt-in, with credentials from the environment only. The default stays "bring your own outputs".
-- **(semantic)** Embedding similarity as an *additional* signal for paraphrase-heavy answers, reported next to token F1 and never replacing it.
-- **(semantic)** LLM-as-judge rubrics with judge-agreement tracking against human labels, displayed with their measured error rate.
+- **Label review and growth:** independent review of the 96 draft claim labels (`review_labels.py`), then grow toward 300+ claims across more models before treating judge numbers as more than provisional.
+- **(semantic)** Embedding retrieval and embedding similarity, alongside BM25 and the lexical groundedness heuristic, compared on the same labelled set.
+- **(semantic)** Stronger local judges (e.g. 7B–8B on a 16 GB machine) and judge ensembles. Each is admitted to gating only if its measured agreement on reviewed labels clears a documented bar.
+- Answer-relevance checks: "is the grounded sentence actually the answer?", the gap shown by the order-cancellation example.
 
 ## Production readiness
 

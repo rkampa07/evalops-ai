@@ -121,6 +121,8 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; background: var(
 .verdict-good { background: var(--good-bg); color: var(--good); }
 .verdict-bad { background: var(--bad-bg); color: var(--bad); }
 .verdict-warn { background: var(--warn-bg); color: var(--warn); }
+.estimated { border-style: dashed; }
+.claims { display: flex; flex-direction: column; gap: 6px; }
 .issues { padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 
 .form { display: flex; flex-direction: column; gap: 12px; }

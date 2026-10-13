@@ -16,6 +16,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -42,6 +43,30 @@ class Dataset(Base):
         back_populates="dataset", cascade="all, delete-orphan", order_by="TestCase.id"
     )
     runs: Mapped[list[EvaluationRun]] = relationship(back_populates="dataset")
+    passages: Mapped[list[Passage]] = relationship(
+        back_populates="dataset", cascade="all, delete-orphan", order_by="Passage.passage_id"
+    )
+
+
+class Passage(Base):
+    """Knowledge-base passage used for RAG evaluation. `passage_id` is the citation id."""
+
+    __tablename__ = "passages"
+    __table_args__ = (UniqueConstraint("dataset_id", "passage_id", name="uq_passage_dataset_pid"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dataset_id: Mapped[int] = mapped_column(
+        ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    passage_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    dataset: Mapped[Dataset] = relationship(back_populates="passages")
 
 
 class TestCase(Base):
@@ -61,6 +86,12 @@ class TestCase(Base):
     json_schema: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     max_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    relevant_passage_ids: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default="[]", nullable=False
+    )
+    expect_abstain: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sa_false(), nullable=False
+    )
     # Incremented when the scoring-relevant definition changes (see engine/versioning.py).
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -92,6 +123,12 @@ class EvaluationRun(Base):
     )
     # Dataset.version at evaluation time; NULL for runs created before version tracking.
     dataset_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # SHA-256 of the knowledge-base passages (id + text) at evaluation time; NULL without a KB.
+    knowledge_base_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Generation metadata supplied by the client (model id/revision, prompt hash, settings).
+    generation: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Model-based (estimated) aggregates, kept apart from the deterministic `summary`.
+    model_graded: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
@@ -126,5 +163,8 @@ class EvaluationResult(Base):
     case_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     case_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     case_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    retrieved_passage_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    generation: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    model_grades: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     run: Mapped[EvaluationRun] = relationship(back_populates="results")

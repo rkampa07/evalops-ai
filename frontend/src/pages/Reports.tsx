@@ -18,11 +18,22 @@ const GATE_FIELDS: { key: keyof GateConfig; label: string; hint: string; needsBa
   { key: "max_failed_cases", label: "Max failed cases", hint: "count" },
   { key: "max_pass_rate_drop", label: "Max pass-rate drop vs baseline", hint: "0–1", needsBaseline: true },
   { key: "max_regressed_cases", label: "Max regressed cases vs baseline", hint: "count", needsBaseline: true },
+  { key: "min_retrieval_recall", label: "Min retrieval recall@k (RAG)", hint: "0–1" },
+  { key: "min_citation_validity", label: "Min citation validity (RAG)", hint: "0–1" },
+  { key: "min_groundedness", label: "Min groundedness, lexical (RAG)", hint: "0–1" },
+  { key: "max_unsupported_claims", label: "Max unsupported claims (RAG)", hint: "count" },
+  { key: "min_abstention_accuracy", label: "Min abstention accuracy (RAG)", hint: "0–1" },
+  { key: "min_estimated_groundedness", label: "Min groundedness, ESTIMATED by judge", hint: "0–1" },
 ];
 
 function fmtGateValue(g: GateResult, v: number | null): string {
   if (v === null) return "n/a";
-  if (g.metric.endsWith("_rate") || g.metric === "pass_rate_drop") return pct(v);
+  if (
+    g.metric.endsWith("_rate") ||
+    g.metric === "pass_rate_drop" ||
+    ["retrieval_recall_at_k", "mrr", "groundedness", "abstention_accuracy", "estimated_groundedness"].includes(g.metric)
+  )
+    return pct(v);
   if (g.metric.endsWith("_ms")) return ms(v);
   return num(v);
 }

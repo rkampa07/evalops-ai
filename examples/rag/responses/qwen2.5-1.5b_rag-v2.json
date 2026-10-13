@@ -1,0 +1,407 @@
+{
+  "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+  "prompt_version": "rag-v2",
+  "label": "Qwen2.5-1.5B-Instruct-4bit with prompt rag-v2",
+  "config": {
+    "min_token_f1": 0.5,
+    "min_groundedness": 0.8
+  },
+  "generation": {
+    "backend": "mlx",
+    "model_id": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "model_revision": "8b403126fc14f14cfc99bb4cfa72ecbc129ea677",
+    "mlx": "0.32.3",
+    "mlx_lm": "0.32.0",
+    "machine": "arm64",
+    "platform": "macOS-27.0.1",
+    "prompt_version": "rag-v2",
+    "prompt_hash": "f6822e655820ba8445b50dde6399a33ac6542ba3aad25bf92683c61de1c8b424",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 256,
+      "seed": 0
+    },
+    "retrieval": {
+      "retriever": "bm25",
+      "k": 3,
+      "k1": 1.5,
+      "b": 0.75
+    },
+    "knowledge_base": "kestrel_policy_kb.json",
+    "generated_at": "2026-10-13T21:57:40+00:00",
+    "evalops_methodology_at_generation": "1.2.0"
+  },
+  "benchmark": {
+    "questions": 20,
+    "model_load_seconds": 0.92,
+    "warmup_latency_ms": 621.5,
+    "total_generation_seconds": 17.24,
+    "latency_ms_p50": 633.5,
+    "latency_ms_max": 3260.2,
+    "peak_metal_memory_mb": 1213.1,
+    "process_max_rss_mb": 937.8,
+    "process_rss_before_model_load_mb": 29.7
+  },
+  "responses": [
+    {
+      "case_key": "q-return-window",
+      "output": "You have 30 days to return your sofa. [KB-RET-01]",
+      "latency_ms": 562.9,
+      "retrieved_passage_ids": [
+        "KB-RET-01",
+        "KB-RET-03",
+        "KB-RET-04"
+      ],
+      "generation": {
+        "latency_ms": 562.9,
+        "prompt_tokens": 220,
+        "completion_tokens": 20,
+        "tokens_per_second": 80.56,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1190.4
+      }
+    },
+    {
+      "case_key": "q-opened-mattress",
+      "output": "No, you cannot return a mattress that has been opened. [KB-RET-01]",
+      "latency_ms": 578.7,
+      "retrieved_passage_ids": [
+        "KB-SUP-01",
+        "KB-RET-03",
+        "KB-RET-01"
+      ],
+      "generation": {
+        "latency_ms": 578.7,
+        "prompt_tokens": 217,
+        "completion_tokens": 21,
+        "tokens_per_second": 79.65,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1190.4
+      }
+    },
+    {
+      "case_key": "q-return-fee",
+      "output": "No, you do not have to pay for return shipping on a $60 order. [KB-ORD-02]",
+      "latency_ms": 693.8,
+      "retrieved_passage_ids": [
+        "KB-RET-03",
+        "KB-ORD-02",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 693.8,
+        "prompt_tokens": 226,
+        "completion_tokens": 27,
+        "tokens_per_second": 80.08,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-refund-timing",
+      "output": "Refunds are typically issued within 5 business days after the returned item arrives at our warehouse. Banks may take an additional 3 to 7 business days to post the refund. [KB-RET-04]",
+      "latency_ms": 878.3,
+      "retrieved_passage_ids": [
+        "KB-RET-04",
+        "KB-RET-01",
+        "KB-RET-03"
+      ],
+      "generation": {
+        "latency_ms": 878.3,
+        "prompt_tokens": 220,
+        "completion_tokens": 45,
+        "tokens_per_second": 79.51,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-damaged-lamp",
+      "output": "If your lamp arrived broken, follow these steps:\n\n1. Take photos of the damage on the Orders page within 14 days of delivery. [KB-DMG-01]\n\n2. Contact Kestrel Home Goods to report the damage. [KB-DMG-01]\n\n3. We will provide a free replacement or issue a full refund. [KB-DMG-01]\n\n4. No need to return the damaged item. [KB-DMG-01]",
+      "latency_ms": 1627.5,
+      "retrieved_passage_ids": [
+        "KB-WAR-02",
+        "KB-WAR-01",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 1627.5,
+        "prompt_tokens": 218,
+        "completion_tokens": 103,
+        "tokens_per_second": 78.41,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-damaged-dresser",
+      "output": "No, we will not ship a new one right away. [KB-DMG-02] For damaged furniture items over 50 pounds, a carrier inspection may be scheduled within 3 business days before a replacement ships. Please contact our customer service for further assistance.",
+      "latency_ms": 1038.1,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-PAY-02",
+        "KB-RET-03"
+      ],
+      "generation": {
+        "latency_ms": 1038.1,
+        "prompt_tokens": 211,
+        "completion_tokens": 57,
+        "tokens_per_second": 78.5,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-pet-damage",
+      "output": "No, scratches made by your dog on the sofa are not covered by the warranty. [KB-WAR-01]",
+      "latency_ms": 633.5,
+      "retrieved_passage_ids": [
+        "KB-WAR-01",
+        "KB-WAR-02",
+        "KB-RET-02"
+      ],
+      "generation": {
+        "latency_ms": 633.5,
+        "prompt_tokens": 201,
+        "completion_tokens": 26,
+        "tokens_per_second": 80.05,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-led-bulb",
+      "output": "The LED bulb you bought separately is covered for 90 days under the warranty. [KB-WAR-01]",
+      "latency_ms": 633.4,
+      "retrieved_passage_ids": [
+        "KB-WAR-02",
+        "KB-WAR-01",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 633.4,
+        "prompt_tokens": 221,
+        "completion_tokens": 26,
+        "tokens_per_second": 81.02,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-warranty-claim",
+      "output": "To file a warranty claim for a wobbly chair, follow these steps:\n\n1. **Order Number**: Obtain your order number from your purchase receipt or email.\n\n2. **Photos**: Take photos of the wobbly chair, focusing on the wobbly parts and any visible damage.\n\n3. **Contact Support**: Reach out to Kestrel Home Goods support using the contact information provided on your order confirmation.\n\n4. **Claim Description**: Provide a detailed description of the issue, including the date of purchase, the location where the chair was used, and the specific problem (wobbly chair).\n\n5. **Request Repair Kit**: Request a repair kit to fix the wobbly part.\n\n6. **Wait for Approval**: Wait for the support team to approve your claim. Approved claims will receive a repair kit, a replacement part, or a replacement item.\n\n7. **Follow Up**: If the repair is not available, contact support again to discuss the next steps.\n\nRemember to keep all documentation, including the order number, photos, and any communication with support, as they are crucial for your warranty claim.",
+      "latency_ms": 3260.2,
+      "retrieved_passage_ids": [
+        "KB-WAR-03",
+        "KB-WAR-02",
+        "KB-WAR-01"
+      ],
+      "generation": {
+        "latency_ms": 3260.2,
+        "prompt_tokens": 210,
+        "completion_tokens": 226,
+        "tokens_per_second": 76.88,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-ship-canada",
+      "output": "Yes, we ship to Canada. Canadian orders usually arrive in 7 to 12 business days. Duties and taxes are collected at checkout.",
+      "latency_ms": 699.7,
+      "retrieved_passage_ids": [
+        "KB-SHP-02",
+        "KB-SHP-01",
+        "KB-PAY-01"
+      ],
+      "generation": {
+        "latency_ms": 699.7,
+        "prompt_tokens": 204,
+        "completion_tokens": 31,
+        "tokens_per_second": 80.73,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-ship-uk",
+      "output": "Yes, you can ship your order to London in the UK. [KB-ORD-01] Orders can be changed or cancelled within 1 hour of purchase from the Orders page. After that, contact support; changes are not guaranteed once an order ships.",
+      "latency_ms": 984.4,
+      "retrieved_passage_ids": [
+        "KB-ORD-02",
+        "KB-RET-03",
+        "KB-ORD-01"
+      ],
+      "generation": {
+        "latency_ms": 984.4,
+        "prompt_tokens": 210,
+        "completion_tokens": 54,
+        "tokens_per_second": 80.25,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-white-glove",
+      "output": "White-glove delivery for a bookshelf is available for a $129 fee.",
+      "latency_ms": 550.3,
+      "retrieved_passage_ids": [
+        "KB-SHP-03",
+        "KB-ORD-02",
+        "KB-RET-01"
+      ],
+      "generation": {
+        "latency_ms": 550.3,
+        "prompt_tokens": 202,
+        "completion_tokens": 19,
+        "tokens_per_second": 81.76,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-cancel-order",
+      "output": "Yes, you can cancel your order within 1 hour of purchase from the Orders page. After that, contact support for assistance. Changes are not guaranteed once an order ships.",
+      "latency_ms": 762.9,
+      "retrieved_passage_ids": [
+        "KB-ORD-01",
+        "KB-SHP-01",
+        "KB-DMG-02"
+      ],
+      "generation": {
+        "latency_ms": 762.9,
+        "prompt_tokens": 207,
+        "completion_tokens": 36,
+        "tokens_per_second": 80.5,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-card-in-chat",
+      "output": "No, we never take card numbers over chat. Payments are only accepted through our secure website checkout. [KB-PAY-01]",
+      "latency_ms": 670.1,
+      "retrieved_passage_ids": [
+        "KB-PAY-01",
+        "KB-RET-02",
+        "KB-WAR-03"
+      ],
+      "generation": {
+        "latency_ms": 670.1,
+        "prompt_tokens": 204,
+        "completion_tokens": 29,
+        "tokens_per_second": 80.26,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-price-drop",
+      "output": "Yes, you can request a price adjustment for the difference. [KB-RET-01]",
+      "latency_ms": 587.4,
+      "retrieved_passage_ids": [
+        "KB-PAY-02",
+        "KB-RET-04",
+        "KB-SHP-01"
+      ],
+      "generation": {
+        "latency_ms": 587.4,
+        "prompt_tokens": 208,
+        "completion_tokens": 21,
+        "tokens_per_second": 76.01,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-late-credit",
+      "output": "I'm sorry to hear that your delivery was late. Unfortunately, we cannot provide credits or discounts. For compensation requests, we escalate to a support specialist who will reply within 2 business days. For more information, please visit our website or contact our customer service team.",
+      "latency_ms": 1008.0,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-SUP-02",
+        "KB-SHP-03"
+      ],
+      "generation": {
+        "latency_ms": 1008.0,
+        "prompt_tokens": 207,
+        "completion_tokens": 55,
+        "tokens_per_second": 78.79,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1197.1
+      }
+    },
+    {
+      "case_key": "q-rewards-points",
+      "output": "To earn a $10 reward, you need to accumulate 500 points.",
+      "latency_ms": 585.1,
+      "retrieved_passage_ids": [
+        "KB-MEM-01",
+        "KB-DMG-01",
+        "KB-SUP-01"
+      ],
+      "generation": {
+        "latency_ms": 585.1,
+        "prompt_tokens": 240,
+        "completion_tokens": 19,
+        "tokens_per_second": 80.96,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1213.1
+      }
+    },
+    {
+      "case_key": "q-showroom-hours",
+      "output": "The Seattle showroom opens at 10 am on Saturdays.",
+      "latency_ms": 466.5,
+      "retrieved_passage_ids": [
+        "KB-SUP-01",
+        "KB-PAY-02",
+        "KB-SAF-01"
+      ],
+      "generation": {
+        "latency_ms": 466.5,
+        "prompt_tokens": 210,
+        "completion_tokens": 13,
+        "tokens_per_second": 83.45,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1213.1
+      }
+    },
+    {
+      "case_key": "q-gift-wrap",
+      "output": "No, we do not offer gift wrapping for orders. [KB-ORD-01]",
+      "latency_ms": 533.4,
+      "retrieved_passage_ids": [
+        "KB-RET-02",
+        "KB-ORD-01",
+        "KB-ORD-02"
+      ],
+      "generation": {
+        "latency_ms": 533.4,
+        "prompt_tokens": 197,
+        "completion_tokens": 20,
+        "tokens_per_second": 88.77,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1213.1
+      }
+    },
+    {
+      "case_key": "q-financing",
+      "output": "No, we do not offer 0% financing on furniture purchases.",
+      "latency_ms": 469.8,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-PAY-02",
+        "KB-ORD-01"
+      ],
+      "generation": {
+        "latency_ms": 469.8,
+        "prompt_tokens": 202,
+        "completion_tokens": 15,
+        "tokens_per_second": 91.66,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1213.1
+      }
+    }
+  ]
+}

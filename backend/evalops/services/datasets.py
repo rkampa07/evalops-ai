@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 
 from ..engine.versioning import case_definition, definition_hash
 from ..errors import ConflictError, NotFoundError, UnprocessableError
-from ..models import Dataset, TestCase
+from ..models import Dataset, Passage, TestCase
 from ..repositories.datasets import DatasetRepository, TestCaseRepository
 from ..schemas import (
     DatasetCreate,
     DatasetOut,
     DatasetUpdate,
+    PassageIn,
+    PassageUpdate,
     TestCaseCreate,
     TestCaseUpdate,
 )
@@ -26,6 +28,8 @@ _CASE_FIELDS = (
     "json_schema",
     "max_latency_ms",
     "tags",
+    "relevant_passage_ids",
+    "expect_abstain",
 )
 
 
@@ -43,6 +47,7 @@ class DatasetService:
         out = DatasetOut.model_validate(ds)
         out.test_case_count = case_counts.get(ds.id, 0)
         out.run_count = run_counts.get(ds.id, 0)
+        out.passage_count = len(ds.passages)
         return out
 
     def list_datasets(self) -> list[DatasetOut]:
@@ -135,7 +140,9 @@ class DatasetService:
         for required in ("key", "input"):
             if required in changes and changes[required] is None:
                 raise UnprocessableError(f"{required} cannot be null")
-        for list_field in ("required_terms", "forbidden_terms", "tags"):
+        if "expect_abstain" in changes and changes["expect_abstain"] is None:
+            changes["expect_abstain"] = False
+        for list_field in ("required_terms", "forbidden_terms", "tags", "relevant_passage_ids"):
             if list_field in changes and changes[list_field] is None:
                 changes[list_field] = []
 
@@ -168,4 +175,49 @@ class DatasetService:
         case = self.get_case(case_id)
         case.dataset.version += 1
         self.cases.delete(case)
+        self.s.commit()
+
+    # ------------------------------------------------------------ knowledge base passages
+
+    def list_passages(self, dataset_id: int) -> list[Passage]:
+        return list(self.get_dataset(dataset_id).passages)
+
+    def _get_passage(self, dataset: Dataset, passage_id: str) -> Passage:
+        for passage in dataset.passages:
+            if passage.passage_id == passage_id:
+                return passage
+        raise NotFoundError(f"passage {passage_id!r} not found in dataset {dataset.id}")
+
+    def create_passages(self, dataset_id: int, items: list[PassageIn]) -> list[Passage]:
+        """Create passages atomically; duplicate ids reject the whole batch."""
+        dataset = self.get_dataset(dataset_id)
+        ids = [p.passage_id for p in items]
+        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        if dupes:
+            raise UnprocessableError(f"duplicate passage ids in request: {dupes}")
+        clash = sorted({p.passage_id for p in dataset.passages} & set(ids))
+        if clash:
+            raise ConflictError(f"passage id(s) already exist in dataset: {clash}")
+        rows = [Passage(dataset_id=dataset_id, **p.model_dump()) for p in items]
+        self.s.add_all(rows)
+        dataset.version += 1  # evidence changed: RAG scores may change
+        self.s.commit()
+        return rows
+
+    def update_passage(self, dataset_id: int, passage_id: str, data: PassageUpdate) -> Passage:
+        dataset = self.get_dataset(dataset_id)
+        passage = self._get_passage(dataset, passage_id)
+        changes = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+        if "text" in changes and changes["text"] != passage.text:
+            dataset.version += 1
+        for field, value in changes.items():
+            setattr(passage, field, value)
+        self.s.commit()
+        return passage
+
+    def delete_passage(self, dataset_id: int, passage_id: str) -> None:
+        dataset = self.get_dataset(dataset_id)
+        passage = self._get_passage(dataset, passage_id)
+        self.s.delete(passage)
+        dataset.version += 1
         self.s.commit()

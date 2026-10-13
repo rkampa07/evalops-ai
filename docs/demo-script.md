@@ -79,3 +79,22 @@ curl -s -X POST http://127.0.0.1:8000/evaluations/gates \
 | UI shows "Cannot reach the EvalOps API" | `make backend` isn't running, or it's on a different port; check `VITE_API_BASE_URL` |
 | Run IDs differ from the script | the DB had earlier data: `make clean-db`, restart backend, `make seed` |
 | Port 5173 in use | Vite uses `strictPort`; stop the other process, or set a different port and add it to `EVALOPS_CORS_ORIGINS` |
+
+---
+
+## Optional extension (+3 minutes): RAG with local models
+
+Setup: `make backend`, `make frontend`, `make rag-demo` (replays recorded Qwen answers and judge
+verdicts; no model download needed).
+
+1. **Datasets → kestrel-policy-rag-v1**: show the knowledge base (20 passages) and the questions with
+   gold passages, including three marked *should decline*.
+2. **Run history → the rag-v2 run**: the *RAG evidence (deterministic)* panel next to *Model-based
+   scores (estimated, not ground truth)*. Expand `q-showroom-hours`: "The Seattle showroom opens at
+   10 am on Saturdays." The heuristic and the judge both mark it unsupported.
+3. **Compare (baseline rag-v1 → candidate rag-v2)**: regression detected; groundedness 0.78 → 0.52;
+   estimated deltas in their own dashed card.
+4. **Release reports**: candidate NOT READY. Then the honest twist: the baseline is not ready
+   either, and why.
+5. Close on calibration: "We measured our own judge. A 3B local judge disagrees with labels too
+   often to gate on, so it's a second opinion, not a referee."

@@ -9,9 +9,10 @@ export function DatasetDetail() {
   const id = Number(useParams().id);
   const navigate = useNavigate();
   const { data, error, loading, reload } = useAsync(
-    () => Promise.all([api.getDataset(id), api.listTestCases(id)]),
+    () => Promise.all([api.getDataset(id), api.listTestCases(id), api.listPassages(id)]),
     [id],
   );
+  const [showPassages, setShowPassages] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<number>();
   const [expanded, setExpanded] = useState<number>();
@@ -20,7 +21,7 @@ export function DatasetDetail() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBanner error={error} onRetry={reload} />;
   if (!data) return null;
-  const [dataset, cases] = data;
+  const [dataset, cases, passages] = data;
 
   async function removeDataset() {
     if (!window.confirm(`Delete dataset "${dataset.name}" and all its test cases?`)) return;
@@ -66,6 +67,34 @@ export function DatasetDetail() {
         }
       />
       {actionError && <ErrorBanner error={actionError} />}
+
+      {passages.length > 0 && (
+        <Card
+          title={`Knowledge base (${passages.length} passages)`}
+          actions={
+            <button className="btn btn-small" onClick={() => setShowPassages(!showPassages)} aria-expanded={showPassages}>
+              {showPassages ? "Hide" : "Show"}
+            </button>
+          }
+        >
+          {showPassages ? (
+            <table className="table compact">
+              <tbody>
+                {passages.map((p) => (
+                  <tr key={p.passage_id}>
+                    <td className="mono">{p.passage_id}</td>
+                    <td>
+                      <strong>{p.title}</strong> {p.text}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="muted small">Passages answers are graded against. Their ids are the citation markers, e.g. [{passages[0]?.passage_id}].</p>
+          )}
+        </Card>
+      )}
 
       <Card
         title={`Test cases (${cases.length})`}
@@ -123,6 +152,8 @@ export function DatasetDetail() {
                         {c.forbidden_terms.length > 0 && <Badge tone="warn">forbidden ×{c.forbidden_terms.length}</Badge>}
                         {c.json_schema && <Badge tone="info">schema</Badge>}
                         {c.max_latency_ms !== null && <Badge tone="neutral">≤{c.max_latency_ms} ms</Badge>}
+                        {c.relevant_passage_ids?.length > 0 && <Badge tone="info">{`gold ${c.relevant_passage_ids.join(", ")}`}</Badge>}
+                        {c.expect_abstain && <Badge tone="warn">should decline</Badge>}
                       </div>
                     </td>
                     <td className="muted small">{c.tags.join(", ")}</td>

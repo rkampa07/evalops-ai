@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Result } from "../api/types";
+import { ClaimsTable, EstimatedCard, GenerationCard, RagEvidenceCard } from "../components/RagPanels";
 import { Badge, Card, ErrorBanner, Loading, Meter, PageHeader, PassBadge, Stat } from "../components/ui";
 import { dateTime, ms, num, pct } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -16,6 +17,13 @@ function ResultChecks({ r }: { r: Result }) {
       {m.forbidden_terms_passed !== undefined && <Badge tone={m.forbidden_terms_passed ? "good" : "bad"}>forbidden</Badge>}
       {m.json_valid !== undefined && <Badge tone={m.json_valid ? "good" : "bad"}>schema</Badge>}
       {m.latency_passed !== undefined && <Badge tone={m.latency_passed ? "good" : "bad"}>latency</Badge>}
+      {m.rag && m.groundedness !== undefined && m.groundedness !== null && (
+        <Badge tone={r.failures.some((f) => f.check === "groundedness") ? "bad" : "good"}>{`grounded ${pct(m.groundedness, 0)}`}</Badge>
+      )}
+      {m.rag && m.citations !== undefined && (
+        <Badge tone={r.failures.some((f) => f.check === "citations") ? "bad" : "good"}>citations</Badge>
+      )}
+      {m.rag && <Badge tone={m.abstention_correct ? "good" : "bad"}>{m.abstained ? "declined" : "answered"}</Badge>}
     </div>
   );
 }
@@ -106,6 +114,20 @@ export function RunDetail() {
         </Card>
       </div>
 
+      {(s.rag_cases ?? 0) > 0 && (
+        <div className="grid-2">
+          <RagEvidenceCard s={s} />
+          {run.model_graded ? (
+            <EstimatedCard mg={run.model_graded} />
+          ) : (
+            <Card title="Model-based scores">
+              <p className="muted small">No model-judge grades attached. Deterministic metrics above are complete on their own.</p>
+            </Card>
+          )}
+        </div>
+      )}
+      {run.generation && <GenerationCard generation={run.generation} />}
+
       <Card
         title={`Results (${results.length})`}
         actions={
@@ -145,6 +167,12 @@ export function RunDetail() {
                       <dl className="kv">
                         <dt>Output</dt>
                         <dd><pre>{r.output ?? "(no response submitted)"}</pre></dd>
+                        {r.metrics.rag && (
+                          <>
+                            <dt>Evidence</dt>
+                            <dd><ClaimsTable r={r} /></dd>
+                          </>
+                        )}
                         <dt>Metrics</dt>
                         <dd><pre>{JSON.stringify(r.metrics, null, 2)}</pre></dd>
                       </dl>

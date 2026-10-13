@@ -1,0 +1,375 @@
+{
+  "judge": {
+    "model_id": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+    "model_revision": "7f0dc925e0d0afb0322d96f9255cfddf2ba5636e",
+    "backend": "mlx",
+    "prompt_version": "judge-v2",
+    "prompt_hash": "92cdf55b31a66c4f6c484ba492e3e6c801b8d5291750822d68883a09c0a03afe",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 4,
+      "seed": 0
+    }
+  },
+  "grades": [
+    {
+      "case_key": "q-cancel-order",
+      "claims": [
+        {
+          "claim": "Yes, you can cancel your order within 1 hour of purchase from the Orders page.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "After that, contact support for assistance.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Changes are not guaranteed once an order ships.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 3306.2
+    },
+    {
+      "case_key": "q-card-in-chat",
+      "claims": [
+        {
+          "claim": "No, we never take card numbers over chat.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Payments are only accepted through our secure website checkout.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 2011.4
+    },
+    {
+      "case_key": "q-damaged-dresser",
+      "claims": [
+        {
+          "claim": "No, we will not ship a new one right away.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "For damaged furniture items over 50 pounds, a carrier inspection may be scheduled within 3 business days before a replacement ships.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Please contact our customer service for further assistance.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 3023.3
+    },
+    {
+      "case_key": "q-damaged-lamp",
+      "claims": [
+        {
+          "claim": "If your lamp arrived broken, follow these steps:",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Take photos of the damage on the Orders page within 14 days of delivery.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Contact Kestrel Home Goods to report the damage.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "We will provide a free replacement or issue a full refund.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "No need to return the damaged item.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 5041.9
+    },
+    {
+      "case_key": "q-financing",
+      "claims": [
+        {
+          "claim": "No, we do not offer 0% financing on furniture purchases.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1003.3
+    },
+    {
+      "case_key": "q-gift-wrap",
+      "claims": [
+        {
+          "claim": "No, we do not offer gift wrapping for orders.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1001.6
+    },
+    {
+      "case_key": "q-late-credit",
+      "claims": [
+        {
+          "claim": "I'm sorry to hear that your delivery was late.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Unfortunately, we cannot provide credits or discounts.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "For compensation requests, we escalate to a support specialist who will reply within 2 business days.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "For more information, please visit our website or contact our customer service team.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 4034.2
+    },
+    {
+      "case_key": "q-led-bulb",
+      "claims": [
+        {
+          "claim": "The LED bulb you bought separately is covered for 90 days under the warranty.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 997.8
+    },
+    {
+      "case_key": "q-opened-mattress",
+      "claims": [
+        {
+          "claim": "No, you cannot return a mattress that has been opened.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1011.7
+    },
+    {
+      "case_key": "q-pet-damage",
+      "claims": [
+        {
+          "claim": "No, scratches made by your dog on the sofa are not covered by the warranty.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1008.0
+    },
+    {
+      "case_key": "q-price-drop",
+      "claims": [
+        {
+          "claim": "Yes, you can request a price adjustment for the difference.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1012.0
+    },
+    {
+      "case_key": "q-refund-timing",
+      "claims": [
+        {
+          "claim": "Refunds are typically issued within 5 business days after the returned item arrives at our warehouse.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Banks may take an additional 3 to 7 business days to post the refund.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2025.5
+    },
+    {
+      "case_key": "q-return-fee",
+      "claims": [
+        {
+          "claim": "No, you do not have to pay for return shipping on a $60 order.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1092.4
+    },
+    {
+      "case_key": "q-return-window",
+      "claims": [
+        {
+          "claim": "You have 30 days to return your sofa.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1015.4
+    },
+    {
+      "case_key": "q-rewards-points",
+      "claims": [
+        {
+          "claim": "To earn a $10 reward, you need to accumulate 500 points.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 1098.6
+    },
+    {
+      "case_key": "q-ship-canada",
+      "claims": [
+        {
+          "claim": "Yes, we ship to Canada.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Canadian orders usually arrive in 7 to 12 business days.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Duties and taxes are collected at checkout.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 3044.8
+    },
+    {
+      "case_key": "q-ship-uk",
+      "claims": [
+        {
+          "claim": "Yes, you can ship your order to London in the UK.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Orders can be changed or cancelled within 1 hour of purchase from the Orders page.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "After that, contact support; changes are not guaranteed once an order ships.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 3057.4
+    },
+    {
+      "case_key": "q-showroom-hours",
+      "claims": [
+        {
+          "claim": "The Seattle showroom opens at 10 am on Saturdays.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1013.6
+    },
+    {
+      "case_key": "q-warranty-claim",
+      "claims": [
+        {
+          "claim": "To file a warranty claim for a wobbly chair, follow these steps:",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "**Order Number**: Obtain your order number from your purchase receipt or email.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "**Photos**: Take photos of the wobbly chair, focusing on the wobbly parts and any visible damage.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "**Contact Support**: Reach out to Kestrel Home Goods support using the contact information provided on your order confirmation.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "**Claim Description**: Provide a detailed description of the issue, including the date of purchase, the location where the chair was used, and the specific problem (wobbly chair).",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "**Request Repair Kit**: Request a repair kit to fix the wobbly part.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "**Wait for Approval**: Wait for the support team to approve your claim.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Approved claims will receive a repair kit, a replacement part, or a replacement item.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "**Follow Up**: If the repair is not available, contact support again to discuss the next steps.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Remember to keep all documentation, including the order number, photos, and any communication with support, as they are crucial for your warranty claim.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 10380.8
+    },
+    {
+      "case_key": "q-white-glove",
+      "claims": [
+        {
+          "claim": "White-glove delivery for a bookshelf is available for a $129 fee.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1031.4
+    }
+  ],
+  "graded_run": {
+    "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "prompt_version": "rag-v2"
+  },
+  "benchmark": {
+    "model_load_seconds": 1.91,
+    "total_seconds": 47.24,
+    "claims": 46
+  }
+}

@@ -9,6 +9,15 @@ export interface Dataset {
   updated_at: string;
   test_case_count: number;
   run_count: number;
+  passage_count: number;
+}
+
+export interface Passage {
+  passage_id: string;
+  title: string;
+  text: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TestCaseInput {
@@ -20,6 +29,8 @@ export interface TestCaseInput {
   json_schema?: Record<string, unknown> | null;
   max_latency_ms?: number | null;
   tags?: string[];
+  relevant_passage_ids?: string[];
+  expect_abstain?: boolean;
 }
 
 export interface TestCase extends Required<TestCaseInput> {
@@ -36,6 +47,7 @@ export interface EvalConfig {
   require_exact_match: boolean;
   case_sensitive: boolean;
   default_max_latency_ms: number | null;
+  min_groundedness?: number;
 }
 
 export interface Failure {
@@ -59,6 +71,55 @@ export interface CaseMetrics {
   latency_ms?: number | null;
   latency_limit_ms?: number;
   latency_passed?: boolean;
+  // RAG (deterministic)
+  rag?: boolean;
+  retrieval_recall?: number;
+  reciprocal_rank?: number;
+  abstained?: boolean;
+  abstention_correct?: boolean;
+  citations?: string[];
+  citations_nonexistent?: string[];
+  citations_not_retrieved?: string[];
+  claims?: ClaimCheck[];
+  groundedness?: number | null;
+  unsupported_claims?: string[];
+}
+
+export interface ClaimCheck {
+  text: string;
+  citations: string[];
+  supported: boolean;
+  passage_id: string | null;
+  coverage: number;
+  missing_numbers: string[];
+}
+
+export interface JudgeInfo {
+  model_id: string;
+  model_revision?: string | null;
+  backend: string;
+  prompt_version: string;
+  prompt_hash: string;
+  settings: Record<string, unknown>;
+}
+
+export interface ModelGrades {
+  label: "estimated";
+  judge: JudgeInfo;
+  latency_ms?: number | null;
+  claims: { claim: string; verdict: "supported" | "unsupported" | "error"; raw?: string | null }[];
+}
+
+export interface ModelGradedSummary {
+  label: "estimated";
+  judge: JudgeInfo;
+  graded_cases: number;
+  claims_total: number;
+  claims_supported: number;
+  claims_error: number;
+  estimated_groundedness: number | null;
+  estimated_unsupported_claims: number;
+  heuristic_judge_agreement: number | null;
 }
 
 export interface Result {
@@ -71,6 +132,9 @@ export interface Result {
   metrics: CaseMetrics;
   failures: Failure[];
   tags: string[];
+  retrieved_passage_ids?: string[] | null;
+  generation?: Record<string, unknown> | null;
+  model_grades?: ModelGrades | null;
   case_version?: number | null;
   case_hash?: string | null;
   case_snapshot?: Record<string, unknown> | null;
@@ -97,6 +161,14 @@ export interface RunSummary {
   latency_max_ms: number | null;
   failure_counts: Record<string, number>;
   tag_pass_rates: Record<string, { cases: number; pass_rate: number | null }>;
+  rag_cases?: number;
+  retrieval_recall_at_k?: number | null;
+  mrr?: number | null;
+  citation_validity_rate?: number | null;
+  citation_support_rate?: number | null;
+  groundedness?: number | null;
+  unsupported_claim_count?: number;
+  abstention_accuracy?: number | null;
 }
 
 export interface Run {
@@ -112,6 +184,9 @@ export interface Run {
   pass_rate: number | null;
   methodology_version: string;
   dataset_version: number | null;
+  knowledge_base_hash?: string | null;
+  generation?: Record<string, unknown> | null;
+  model_graded?: ModelGradedSummary | null;
   created_at: string;
 }
 
@@ -202,6 +277,8 @@ export interface Comparison {
   case_counts: Record<CaseChangeKind, number>;
   case_changes: CaseChange[];
   config: { metric_tolerance: number; latency_tolerance_pct: number; case_f1_drop_threshold: number };
+  estimated_metric_deltas?: MetricDelta[];
+  estimated_note?: string | null;
 }
 
 export interface GateConfig {
@@ -216,6 +293,13 @@ export interface GateConfig {
   max_failed_cases?: number;
   max_pass_rate_drop?: number;
   max_regressed_cases?: number;
+  min_retrieval_recall?: number;
+  min_mrr?: number;
+  min_citation_validity?: number;
+  min_groundedness?: number;
+  max_unsupported_claims?: number;
+  min_abstention_accuracy?: number;
+  min_estimated_groundedness?: number;
 }
 
 export interface GateResult {

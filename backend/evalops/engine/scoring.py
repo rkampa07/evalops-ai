@@ -8,6 +8,7 @@ from statistics import fmean
 from typing import Any
 
 from . import metrics as m
+from . import rag
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,8 @@ class EvalConfig:
     require_exact_match: bool = False
     case_sensitive: bool = False
     default_max_latency_ms: float | None = None
+    # RAG: minimum share of claims supported by retrieved passages (lexical heuristic).
+    min_groundedness: float = 0.8
 
 
 @dataclass(frozen=True)
@@ -29,12 +32,21 @@ class CaseSpec:
     json_schema: dict[str, Any] | None = None
     max_latency_ms: float | None = None
     tags: list[str] = field(default_factory=list)
+    # RAG: gold passages for retrieval metrics; whether the correct behaviour is to decline.
+    relevant_passage_ids: list[str] = field(default_factory=list)
+    expect_abstain: bool = False
+
+    @property
+    def is_rag(self) -> bool:
+        return bool(self.relevant_passage_ids) or self.expect_abstain
 
 
 @dataclass(frozen=True)
 class ResponseSpec:
     output: str
     latency_ms: float | None = None
+    # RAG: passage ids the application put in the model's context, in rank order.
+    retrieved_passage_ids: list[str] | None = None
 
 
 @dataclass
@@ -50,8 +62,17 @@ def _failure(check: str, message: str) -> dict[str, str]:
     return {"check": check, "message": message}
 
 
-def score_case(case: CaseSpec, response: ResponseSpec | None, config: EvalConfig) -> CaseResult:
-    """Run every check that applies to the case. The case passes only if every check passes."""
+def score_case(
+    case: CaseSpec,
+    response: ResponseSpec | None,
+    config: EvalConfig,
+    knowledge_base: dict[str, str] | None = None,
+) -> CaseResult:
+    """Run every check that applies to the case. The case passes only if every check passes.
+
+    RAG checks run when the case is a RAG case (gold passages or expected abstention) or the
+    response reports retrieved passages, and a knowledge base is supplied.
+    """
     if response is None:
         return CaseResult(
             key=case.key,
@@ -128,6 +149,19 @@ def score_case(case: CaseSpec, response: ResponseSpec | None, config: EvalConfig
                     )
                 )
 
+    # RAG evidence checks
+    if knowledge_base and (case.is_rag or response.retrieved_passage_ids is not None):
+        rag_metrics, rag_failures = rag.evaluate_rag(
+            out,
+            relevant_ids=case.relevant_passage_ids,
+            expect_abstain=case.expect_abstain,
+            retrieved_ids=response.retrieved_passage_ids,
+            knowledge_base=knowledge_base,
+            min_groundedness=config.min_groundedness,
+        )
+        metrics |= rag_metrics
+        failures.extend(rag_failures)
+
     return CaseResult(
         key=case.key, passed=not failures, metrics=metrics, failures=failures, tags=list(case.tags)
     )
@@ -181,8 +215,38 @@ def summarize(results: list[CaseResult]) -> dict[str, Any]:
         "latency_p50_ms": m.percentile(latencies, 50),
         "latency_p95_ms": m.percentile(latencies, 95),
         "latency_max_ms": max(latencies) if latencies else None,
+        **_rag_summary(responded),
         "failure_counts": dict(sorted(failure_counts.items())),
         "tag_pass_rates": {
             t: {"cases": len(f), "pass_rate": _rate(f)} for t, f in sorted(tag_flags.items())
         },
+    }
+
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return round(numerator / denominator, 6) if denominator else None
+
+
+def _rag_summary(responded: list[CaseResult]) -> dict[str, Any]:
+    """RAG aggregates (deterministic). Claim and citation rates are micro-averaged."""
+    rag_results = [r for r in responded if r.metrics.get("rag")]
+
+    def total(key: str) -> int:
+        return sum(r.metrics.get(key, 0) for r in rag_results)
+
+    recalls = [
+        r.metrics["retrieval_recall"] for r in rag_results if "retrieval_recall" in r.metrics
+    ]
+    ranks = [r.metrics["reciprocal_rank"] for r in rag_results if "reciprocal_rank" in r.metrics]
+    return {
+        "rag_cases": len(rag_results),
+        "retrieval_recall_at_k": _mean(recalls),
+        "mrr": _mean(ranks),
+        "citation_validity_rate": _ratio(total("citations_valid"), total("citations_total")),
+        "citation_support_rate": _ratio(
+            total("citation_pairs_supporting"), total("citation_pairs_total")
+        ),
+        "groundedness": _ratio(total("claims_supported"), total("claims_total")),
+        "unsupported_claim_count": total("claims_total") - total("claims_supported"),
+        "abstention_accuracy": _rate([r.metrics["abstention_correct"] for r in rag_results]),
     }

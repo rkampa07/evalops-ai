@@ -75,3 +75,24 @@ It also surfaced good news. Latency fell by more than half, and production's own
 - **Twelve cases is a starting point, not statistical evidence.** One case flip moves the pass rate by 8.3 points. The roadmap is to grow to 150+ cases stratified by ticket category.
 - Token F1 penalizes valid paraphrases. Policy cases pair it with required terms and a modest threshold (0.5).
 - The forbidden-term check is deliberately conservative and can flag refusals that quote a forbidden word. Flagged cases get reviewed rather than auto-dismissed.
+
+## Phase 2 of the engagement: the policy assistant (RAG)
+
+Kestrel next asked for a self-serve **policy assistant** that answers from 20 approved policy
+passages. Before buying any hosted model, the FDE prototyped it **entirely on a laptop**: BM25
+retrieval plus Qwen2.5-1.5B (4-bit, MLX), with a Llama-3.2-3B model as a second-opinion judge.
+
+The product team proposed a "friendlier" prompt that "always tries to help". On the 20-question
+evaluation set it **regressed** sharply: lexical groundedness 0.78 → 0.52. It made up Seattle
+showroom hours, promised UK shipping (the policy is Canada only) and answered all three questions
+the policies don't cover, where the baseline correctly declined. EvalOps flagged 7 regressed cases
+and blocked the release.
+
+It also gave the uncomfortable but useful answer that **the baseline isn't release-ready either**.
+It skips citations, refuses two answerable questions, and lexical retrieval misses a few
+vocabulary mismatches. That redirected the next sprint from prompt polish to retrieval and citation
+enforcement.
+
+The judge was measured before being trusted: on held-out real answers the local 3B judge agreed with
+draft labels at only κ = 0.34. It's shown as an *estimated* signal and kept out of the default
+gates. See [rag-evaluation.md](rag-evaluation.md).
