@@ -152,7 +152,7 @@ def test_grounded_run_passes_with_rag_metrics(client, rag_ds):
     res = {r["case_key"]: r for r in run["results"]}
     assert res["return-fee"]["retrieved_passage_ids"] == RETRIEVED["return-fee"]
     assert res["return-fee"]["generation"] == {"completion_tokens": 20}
-    assert run["methodology_version"] == "1.2.0"
+    assert run["methodology_version"] == "2.0.0"
 
 
 def test_ungrounded_run_fails_specific_checks(client, rag_ds):

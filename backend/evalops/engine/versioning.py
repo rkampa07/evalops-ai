@@ -12,6 +12,16 @@ History:
 - 1.1.0  JSON Schema `pattern` evaluated with a time limit; `patternProperties` rejected
 - 1.2.0  RAG evidence checks (retrieval, citations, lexical groundedness, abstention); additive,
          scores of non-RAG cases are unchanged
+- 1.3.0  RAG answers with no checkable statement (empty or only citation markers) fail a
+         "content" check. Found while analysing rag-v3; stricter only for degenerate output,
+         scores of well-formed answers are unchanged (pinned by tests/regression)
+- 1.4.0  Fix 1.3.0 over-rejection: the "content" check now fails only empty, punctuation-only
+         or citation-only answers. Short answers with no extractable claim ("30 days
+         [KB-RET-01].") and non-Latin answers no longer fail it (they pass, as under 1.2.0)
+- 2.0.0  MAJOR: short segments containing a number are now claims ("60 days [KB-RET-01]." fails
+         groundedness instead of passing unchecked), and numbered-list markers are removed
+         before sentence splitting. Can change scores for the same inputs, so 1.x runs are
+         not comparable with 2.x runs
 """
 
 from __future__ import annotations
@@ -21,7 +31,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-METHODOLOGY_VERSION = "1.2.0"
+METHODOLOGY_VERSION = "2.0.0"
 
 # Fields that determine how a response is scored. Tags and key are identity/labels, not scoring.
 DEFINITION_FIELDS = (

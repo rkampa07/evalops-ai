@@ -51,7 +51,7 @@ def test_methodology_compatibility():
     assert methodology_compatibility("1.0.0", "1.1.0") == "warning"
     assert methodology_compatibility("1.1.0", "2.0.0") == "error"
     assert methodology_compatibility("garbage", "1.1.0") == "error"
-    assert METHODOLOGY_VERSION == "1.2.0"
+    assert METHODOLOGY_VERSION == "2.0.0"
 
 
 def test_migration_hash_matches_engine_hash():

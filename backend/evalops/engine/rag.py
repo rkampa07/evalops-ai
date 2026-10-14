@@ -85,6 +85,11 @@ _CITATION_GROUP_RE = re.compile(r"\[([^\[\]]+)\]")
 _CITATION_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
 _BULLET_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+# Numbered-list markers, removed BEFORE sentence splitting so "1." is never a claim: at a line
+# start, or inline after ":" or sentence-final punctuation ("steps: 1. Do X. 2. Do Y.").
+# "The fee is 5. Refunds…" is not a marker (no punctuation before "5").
+_LINE_LIST_MARKER_RE = re.compile(r"(?m)^[ \t]*\d{1,2}[.)][ \t]+")
+_INLINE_LIST_MARKER_RE = re.compile(r"(?<=[:.!?])[ \t]+\d{1,2}[.)][ \t]+(?=\S)")
 _NUMBER_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -213,6 +218,15 @@ def _strip_citations(text: str) -> str:
     return re.sub(r"\s{2,}", " ", text).strip()
 
 
+def has_meaningful_content(text: str) -> bool:
+    """True if anything besides citation markers, punctuation and whitespace remains.
+
+    Independent of claim extraction, so short answers ("30 days [KB-RET-01].") and non-Latin
+    answers count as content even when they yield no checkable claim.
+    """
+    return any(ch.isalnum() for ch in _strip_citations(text))
+
+
 def is_abstention(text: str) -> bool:
     norm = normalize_text(text)
     return any(marker in norm for marker in _ABSTENTION_MARKERS)
@@ -228,8 +242,11 @@ def split_claims(text: str) -> list[Claim]:
     """Split an answer into checkable claims (sentences / bullet items).
 
     Dropped: questions, courtesy filler ("Hope this helps."), abstention sentences, and
-    fragments with fewer than two content words.
+    fragments with fewer than two content words unless they contain a number ("30 days.",
+    "$9.95."), whose numbers are then checked against the evidence.
     """
+    text = _LINE_LIST_MARKER_RE.sub("", text)
+    text = _INLINE_LIST_MARKER_RE.sub("\n", text)  # each list item becomes its own segment
     claims = []
     for raw in _SENTENCE_SPLIT_RE.split(text):
         sentence = _BULLET_RE.sub("", raw).strip()
@@ -243,7 +260,7 @@ def split_claims(text: str) -> list[Claim]:
             or clean.rstrip().endswith("?")
             or norm.startswith(_FILLER_PREFIXES)
             or is_abstention(clean)
-            or len(content_tokens(clean)) < 2
+            or (len(content_tokens(clean)) < 2 and not extract_numbers(clean))
         ):
             continue
         claims.append(Claim(clean, citations))
@@ -387,6 +404,14 @@ def evaluate_rag(
         "citation_pairs_total": pairs_total,
         "citation_pairs_supporting": pairs_supporting,
     }
+    if not abstained and not has_meaningful_content(output):
+        # Empty, punctuation-only or citation-only output must not pass by having nothing to fail.
+        failures.append(
+            {
+                "check": "content",
+                "message": "answer has no content besides citation markers or punctuation",
+            }
+        )
     if groundedness is not None and groundedness < min_groundedness:
         failures.append(
             {

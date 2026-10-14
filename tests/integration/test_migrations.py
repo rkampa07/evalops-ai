@@ -189,7 +189,7 @@ def test_upgrade_preserves_and_backfills_legacy_data(tmp_path):
         changes = {x["case_key"]: x["change"] for x in body["case_changes"]}
         assert changes == {"stable": "regressed", "edited_later": "definition_unknown"}
         assert body["has_regression"] is True and body["compatible"] is True
-        # a new run under the current methodology is still comparable, with a warning
+        # a new run under the current MAJOR methodology (2.x) is not comparable with 1.0.0 runs
         new = c.post(
             "/evaluations/runs",
             json={
@@ -205,5 +205,8 @@ def test_upgrade_preserves_and_backfills_legacy_data(tmp_path):
         cmp = c.get(
             "/evaluations/compare", params={"baseline_run_id": 1, "candidate_run_id": new["id"]}
         ).json()
-        assert cmp["compatible"] is True
-        assert any(i["kind"] == "methodology_version" for i in cmp["compatibility_issues"])
+        assert cmp["compatible"] is False and cmp["has_regression"] is False
+        assert any(
+            i["kind"] == "methodology_version" and i["severity"] == "error"
+            for i in cmp["compatibility_issues"]
+        )

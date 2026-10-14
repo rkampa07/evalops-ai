@@ -193,3 +193,94 @@ class TestEvaluateRag:
     def test_unknown_retrieved_ids_rejected(self):
         with pytest.raises(ValueError, match="unknown passage"):
             self.evaluate("x", retrieved_ids=["NOPE-1"])
+
+
+class TestDegenerateAnswers:
+    """Found while analysing rag-v3: an answer made only of citation markers passed."""
+
+    def evaluate(self, output, **kw):
+        args = {
+            "relevant_ids": ["KB-RET-01"],
+            "expect_abstain": False,
+            "retrieved_ids": ["KB-RET-01", "KB-RET-03", "KB-SHP-02"],
+            "knowledge_base": KB,
+            "min_groundedness": 0.8,
+        } | kw
+        return rag.evaluate_rag(output, **args)
+
+    def test_citations_only_answer_fails(self):
+        m, failures = self.evaluate("[KB-RET-01] [KB-RET-03] [KB-RET-03] [KB-RET-03]")
+        assert m["claims_total"] == 0
+        assert [f["check"] for f in failures] == ["content"]
+
+    def test_empty_answer_fails(self):
+        _, failures = self.evaluate("   ")
+        assert "content" in [f["check"] for f in failures]
+
+    def test_abstention_is_not_a_content_failure(self):
+        _, failures = self.evaluate(
+            "I don't have that information in our policies.", relevant_ids=[], expect_abstain=True
+        )
+        assert failures == []
+
+    def test_short_numeric_answer_is_meaningful_content(self):
+        _, failures = self.evaluate("30 days [KB-RET-01].")
+        assert "content" not in [f["check"] for f in failures]
+
+    def test_non_latin_answer_is_meaningful_content(self):
+        _, failures = self.evaluate("30日以内です [KB-RET-01]")
+        assert "content" not in [f["check"] for f in failures]
+
+    def test_punctuation_only_answer_fails(self):
+        _, failures = self.evaluate("... !! -- [KB-RET-01] .")
+        assert "content" in [f["check"] for f in failures]
+
+
+class TestNumericClaims:
+    """Methodology 2.0.0: short segments with numbers are checkable claims."""
+
+    def evaluate(self, output):
+        return rag.evaluate_rag(
+            output,
+            relevant_ids=["KB-RET-01"],
+            expect_abstain=False,
+            retrieved_ids=["KB-RET-01", "KB-RET-03", "KB-SHP-02"],
+            knowledge_base=KB,
+            min_groundedness=0.8,
+        )
+
+    def test_supported_short_numeric_claim(self):
+        assert [c.text for c in rag.split_claims("30 days [KB-RET-01].")] == ["30 days."]
+        m, failures = self.evaluate("30 days [KB-RET-01].")
+        assert m["groundedness"] == 1.0 and failures == []
+
+    def test_unsupported_short_numeric_claim(self):
+        m, failures = self.evaluate("60 days [KB-RET-01].")
+        assert m["groundedness"] == 0.0 and m["claims"][0]["missing_numbers"] == ["60"]
+        assert [f["check"] for f in failures] == ["groundedness"]
+
+    def test_bare_numbers(self):
+        assert self.evaluate("30 [KB-RET-01].")[0]["groundedness"] == 1.0
+        assert self.evaluate("45 [KB-RET-01].")[0]["groundedness"] == 0.0
+
+    def test_decimal_fees(self):
+        assert [c.text for c in rag.split_claims("$9.95 [KB-RET-03].")] == ["$9.95."]
+        assert self.evaluate("$9.95 [KB-RET-03].")[0]["groundedness"] == 1.0
+        assert self.evaluate("$7.95 [KB-RET-03].")[0]["groundedness"] == 0.0
+
+    def test_numbered_list_markers_are_not_claims(self):
+        multiline = "Steps:\n1. Return items within 30 days [KB-RET-01].\n2) Get a full refund."
+        inline = "Steps: 1. Return items within 30 days. 2. Get a full refund."
+        expected = ["Return items within 30 days.", "Get a full refund."]
+        assert [c.text for c in rag.split_claims(multiline)] == expected
+        assert [c.text for c in rag.split_claims(inline)] == expected
+
+    def test_sentence_ending_in_a_number_is_kept(self):
+        assert [c.text for c in rag.split_claims("The fee is 5. Refunds follow.")] == [
+            "The fee is 5.",
+            "Refunds follow.",
+        ]
+
+    def test_citation_only_still_fails_content(self):
+        m, failures = self.evaluate("[KB-RET-01] [KB-RET-03].")
+        assert m["claims_total"] == 0 and [f["check"] for f in failures] == ["content"]
