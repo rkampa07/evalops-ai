@@ -9,6 +9,8 @@ API_URL ?= http://127.0.0.1:8000
 GEN_MODEL   ?= mlx-community/Qwen2.5-1.5B-Instruct-4bit
 JUDGE_MODEL ?= mlx-community/Llama-3.2-3B-Instruct-4bit
 RAG         := examples/rag
+# Live generation/judging writes here (git-ignored); committed recordings are never overwritten.
+LIVE        := $(RAG)/live
 
 setup:            ## Create the venv and install backend + frontend dependencies
 	test -d backend/.venv || python3 -m venv backend/.venv
@@ -61,14 +63,16 @@ rag-demo-live:    ## Same, but run the judge model live (needs setup-local-ai + 
 	$(PY) backend/scripts/rag_demo.py --base-url $(API_URL) --judge live
 
 rag-generate:     ## Regenerate answers for both prompts with the local model, one at a time, measured
+	mkdir -p $(LIVE)/responses $(LIVE)/benchmarks
 	for v in rag-v1 rag-v2 rag-v3; do \
 		/usr/bin/time -l $(PY) backend/scripts/rag_generate.py --prompt-version $$v --model $(GEN_MODEL) \
-			--out $(RAG)/responses/qwen2.5-1.5b_$$v.json 2> $(RAG)/benchmarks/time_qwen2.5-1.5b_$$v.txt; \
+			--out $(LIVE)/responses/qwen2.5-1.5b_$$v.json 2> $(LIVE)/benchmarks/time_qwen2.5-1.5b_$$v.txt; \
 	done
 
 rag-calibrate:    ## Measure heuristic + judge agreement with the labelled claims
+	mkdir -p $(LIVE)/calibration $(LIVE)/benchmarks
 	/usr/bin/time -l $(PY) backend/scripts/rag_judge.py calibrate --model $(JUDGE_MODEL) \
-		--out $(RAG)/calibration/llama3.2-3b_judge-v2.json 2> $(RAG)/benchmarks/time_llama3.2-3b_calibrate_v2.txt
+		--out $(LIVE)/calibration/llama3.2-3b_judge-v2.json 2> $(LIVE)/benchmarks/time_llama3.2-3b_calibrate_v2.txt
 
 labels-export:    ## Write examples/rag/labels/claims_review.csv for review in Excel / Google Sheets
 	$(PY) backend/scripts/labels_csv.py export

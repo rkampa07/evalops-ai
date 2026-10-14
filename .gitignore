@@ -31,3 +31,6 @@ examples/rag/labels/*_priority.csv
 # Playwright outputs
 frontend/test-results/
 frontend/playwright-report/
+
+# Live RAG generation/judging outputs (committed evidence lives elsewhere and is never overwritten)
+examples/rag/live/

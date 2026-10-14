@@ -164,7 +164,15 @@ against drafts. Human review and calibration on reviewed labels remain incomplet
 4. **Re-measure** on reviewed labels only:
 
        backend/.venv/bin/python backend/scripts/rag_judge.py calibrate --reviewed-only \
-           --out examples/rag/calibration/llama3.2-3b_judge-v2_reviewed.json
+           --out examples/rag/live/calibration/llama3.2-3b_judge-v2_reviewed.json
+
+   **Live and scratch outputs go to `examples/rag/live/` (git-ignored).** `rag_generate.py` and
+   `rag_judge.py` refuse to write anywhere else under `examples/rag/`: responses, grades,
+   calibration, benchmarks, prospective sets, experiments, labels and datasets are committed
+   evidence and stay read-only (reading them, e.g. `rag_judge.py attach --grades`, still works).
+   `make rag-generate`, `make rag-calibrate` and `make rag-demo-live` write their outputs under
+   `examples/rag/live/`. To promote a reviewed result into evidence, copy it deliberately and
+   commit it as a separate, reviewed change.
 
 **AI pre-screens are hints, not reviews.** A CSV annotated by another AI tool (columns *AI
 Suggested Label*, *AI Review Notes*, *AI Review Flag*) can be turned into a priority review file:

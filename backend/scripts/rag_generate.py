@@ -23,6 +23,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _evidence import assert_writable  # noqa: E402
 
 from evalops.engine.versioning import METHODOLOGY_VERSION  # noqa: E402
 from evalops.llm.backends import GenerationSettings, MLXBackend  # noqa: E402
@@ -48,6 +51,10 @@ def main() -> None:
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--limit", type=int, default=None, help="only the first N questions")
     args = parser.parse_args()
+    try:  # fail before loading any model
+        assert_writable(args.out)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     dataset = json.loads(args.kb.read_text())
     retriever = Retriever(dataset["passages"], k=args.k)

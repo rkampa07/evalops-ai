@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _api import call  # noqa: E402
+from _evidence import assert_writable  # noqa: E402
 
 from evalops.engine.agreement import binary_agreement  # noqa: E402
 from evalops.engine.rag import lexical_support  # noqa: E402
@@ -207,6 +208,12 @@ def main() -> None:
     att.set_defaults(func=attach)
 
     args = parser.parse_args()
+    for output in (getattr(args, "out", None), getattr(args, "save", None)):
+        if output is not None:
+            try:  # fail before loading a model or calling the API
+                assert_writable(output)
+            except ValueError as exc:
+                parser.error(str(exc))
     args.func(args)
 
 

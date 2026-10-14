@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _api import call  # noqa: E402
+from _evidence import LIVE_DIR, live_output_path  # noqa: E402
 
 from evalops.engine.versioning import METHODOLOGY_VERSION  # noqa: E402
 
@@ -90,6 +91,8 @@ def attach_grades(base: str, run: dict, path: Path, mode: str) -> None:
     script = Path(__file__).resolve().parent / "rag_judge.py"
     grades = GRADES[path]
     if mode == "live":
+        # rag_judge.py creates the parent directory when it saves.
+        live_grades = live_output_path(LIVE_DIR / "grades" / grades.name)
         cmd = [
             "grade-run",
             "--run-id",
@@ -97,7 +100,7 @@ def attach_grades(base: str, run: dict, path: Path, mode: str) -> None:
             "--model",
             JUDGE_MODEL,
             "--save",
-            str(grades),
+            str(live_grades),
         ]
     elif mode == "replay":
         if not grades.exists():
