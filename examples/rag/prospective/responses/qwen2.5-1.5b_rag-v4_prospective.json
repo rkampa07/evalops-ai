@@ -1,0 +1,119 @@
+{
+  "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+  "prompt_version": "rag-v4",
+  "label": "Qwen2.5-1.5B-Instruct-4bit with prompt rag-v4",
+  "config": {
+    "min_token_f1": 0.5,
+    "min_groundedness": 0.8
+  },
+  "generation": {
+    "backend": "mlx",
+    "model_id": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "model_revision": "8b403126fc14f14cfc99bb4cfa72ecbc129ea677",
+    "mlx": "0.32.3",
+    "mlx_lm": "0.32.0",
+    "machine": "arm64",
+    "platform": "macOS-27.0.1",
+    "prompt_version": "rag-v4",
+    "prompt_hash": "dd406723f9d02ca4fbe05a128a730cfa98875f291a450cabaf7377505ce20969",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 256,
+      "seed": 0
+    },
+    "retrieval": {
+      "retriever": "bm25",
+      "k": 3,
+      "k1": 1.5,
+      "b": 0.75
+    },
+    "knowledge_base": "kestrel_prospective_unanswerable.json",
+    "generated_at": "2026-10-14T00:50:05+00:00",
+    "evalops_methodology_at_generation": "2.0.0"
+  },
+  "benchmark": {
+    "questions": 4,
+    "model_load_seconds": 0.9,
+    "warmup_latency_ms": 785.0,
+    "total_generation_seconds": 2.34,
+    "latency_ms_p50": 582.4,
+    "latency_ms_max": 584.6,
+    "peak_metal_memory_mb": 1324.9,
+    "process_max_rss_mb": 908.2,
+    "process_rss_before_model_load_mb": 29.6
+  },
+  "responses": [
+    {
+      "case_key": "q-p-phone-number",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 584.6,
+      "retrieved_passage_ids": [
+        "KB-PAY-01",
+        "KB-PAY-02",
+        "KB-WAR-03"
+      ],
+      "generation": {
+        "latency_ms": 584.6,
+        "prompt_tokens": 323,
+        "completion_tokens": 11,
+        "tokens_per_second": 90.86,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1306.7
+      }
+    },
+    {
+      "case_key": "q-p-mobile-app",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 582.6,
+      "retrieved_passage_ids": [
+        "KB-ORD-01",
+        "KB-ORD-02",
+        "KB-RET-03"
+      ],
+      "generation": {
+        "latency_ms": 582.6,
+        "prompt_tokens": 336,
+        "completion_tokens": 11,
+        "tokens_per_second": 93.5,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1318.8
+      }
+    },
+    {
+      "case_key": "q-p-fabric-swatches",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 582.4,
+      "retrieved_passage_ids": [
+        "KB-ORD-01",
+        "KB-ORD-02",
+        "KB-RET-03"
+      ],
+      "generation": {
+        "latency_ms": 582.4,
+        "prompt_tokens": 337,
+        "completion_tokens": 11,
+        "tokens_per_second": 92.55,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1319.5
+      }
+    },
+    {
+      "case_key": "q-p-warehouse-pickup",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 579.5,
+      "retrieved_passage_ids": [
+        "KB-ORD-02",
+        "KB-RET-03",
+        "KB-ORD-01"
+      ],
+      "generation": {
+        "latency_ms": 579.5,
+        "prompt_tokens": 341,
+        "completion_tokens": 11,
+        "tokens_per_second": 94.71,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1324.9
+      }
+    }
+  ]
+}

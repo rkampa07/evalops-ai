@@ -1,0 +1,191 @@
+{
+  "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+  "prompt_version": "rag-v5",
+  "label": "Qwen2.5-1.5B-Instruct-4bit with prompt rag-v5",
+  "config": {
+    "min_token_f1": 0.5,
+    "min_groundedness": 0.8
+  },
+  "generation": {
+    "backend": "mlx",
+    "model_id": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "model_revision": "8b403126fc14f14cfc99bb4cfa72ecbc129ea677",
+    "mlx": "0.32.3",
+    "mlx_lm": "0.32.0",
+    "machine": "arm64",
+    "platform": "macOS-27.0.1",
+    "prompt_version": "rag-v5",
+    "prompt_hash": "0cb9aaf388d4cea97a6c056629b0ef962ecb653d7287070b33ddf932104af1e5",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 256,
+      "seed": 0
+    },
+    "retrieval": {
+      "retriever": "bm25",
+      "k": 3,
+      "k1": 1.5,
+      "b": 0.75
+    },
+    "knowledge_base": "kestrel_prospective_v2.json",
+    "generated_at": "2026-10-14T00:56:13+00:00",
+    "evalops_methodology_at_generation": "2.0.0"
+  },
+  "benchmark": {
+    "questions": 8,
+    "model_load_seconds": 0.96,
+    "warmup_latency_ms": 909.4,
+    "total_generation_seconds": 6.49,
+    "latency_ms_p50": 761.3,
+    "latency_ms_max": 940.1,
+    "peak_metal_memory_mb": 1448.4,
+    "process_max_rss_mb": 694.0,
+    "process_rss_before_model_load_mb": 29.7
+  },
+  "responses": [
+    {
+      "case_key": "q-p2-candle-wick",
+      "output": "You should trim the wick to 6 mm before each use [KB-SAF-01].",
+      "latency_ms": 839.8,
+      "retrieved_passage_ids": [
+        "KB-SAF-01",
+        "KB-PAY-02",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 839.8,
+        "prompt_tokens": 435,
+        "completion_tokens": 22,
+        "tokens_per_second": 86.93,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1442.3
+      }
+    },
+    {
+      "case_key": "q-p2-points-expiry",
+      "output": "Yes, your Kestrel Rewards points may expire if they are not used within 12 months. [KB-MEM-01]",
+      "latency_ms": 939.7,
+      "retrieved_passage_ids": [
+        "KB-MEM-01",
+        "KB-PAY-01",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 939.7,
+        "prompt_tokens": 437,
+        "completion_tokens": 30,
+        "tokens_per_second": 85.39,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-p2-lamp-warranty",
+      "output": "The warranty on a floor lamp is 1 year [KB-WAR-02].",
+      "latency_ms": 761.3,
+      "retrieved_passage_ids": [
+        "KB-WAR-02",
+        "KB-WAR-03",
+        "KB-WAR-01"
+      ],
+      "generation": {
+        "latency_ms": 761.3,
+        "prompt_tokens": 417,
+        "completion_tokens": 19,
+        "tokens_per_second": 86.7,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-p2-address-after-ship",
+      "output": "No, once an order has shipped, address changes must be requested through the carrier [KB-ORD-02].",
+      "latency_ms": 870.3,
+      "retrieved_passage_ids": [
+        "KB-ORD-02",
+        "KB-ORD-01",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 870.3,
+        "prompt_tokens": 435,
+        "completion_tokens": 25,
+        "tokens_per_second": 87.49,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-p2-custom-sofa-return",
+      "output": "Yes, you can return a custom-made sofa within 30 days of delivery for a full refund to the original payment method [KB-RET-01].",
+      "latency_ms": 940.1,
+      "retrieved_passage_ids": [
+        "KB-RET-02",
+        "KB-RET-03",
+        "KB-RET-01"
+      ],
+      "generation": {
+        "latency_ms": 940.1,
+        "prompt_tokens": 416,
+        "completion_tokens": 34,
+        "tokens_per_second": 85.72,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-p2-furniture-rental",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 667.6,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-WAR-01",
+        "KB-SHP-03"
+      ],
+      "generation": {
+        "latency_ms": 667.6,
+        "prompt_tokens": 412,
+        "completion_tokens": 11,
+        "tokens_per_second": 87.53,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-p2-design-consult",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 704.3,
+      "retrieved_passage_ids": [
+        "KB-DMG-01",
+        "KB-DMG-02",
+        "KB-MEM-01"
+      ],
+      "generation": {
+        "latency_ms": 704.3,
+        "prompt_tokens": 440,
+        "completion_tokens": 11,
+        "tokens_per_second": 91.43,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1448.4
+      }
+    },
+    {
+      "case_key": "q-p2-wedding-registry",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 726.4,
+      "retrieved_passage_ids": [
+        "KB-RET-02",
+        "KB-DMG-01",
+        "KB-DMG-02"
+      ],
+      "generation": {
+        "latency_ms": 726.4,
+        "prompt_tokens": 423,
+        "completion_tokens": 11,
+        "tokens_per_second": 80.63,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1448.4
+      }
+    }
+  ]
+}

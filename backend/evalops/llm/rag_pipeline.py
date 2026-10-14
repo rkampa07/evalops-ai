@@ -32,6 +32,61 @@ PROMPTS: dict[str, dict[str, str]] = {
         ),
         "user": "Policy passages:\n{passages}\n\nCustomer question: {question}",
     },
+    # rag-v3: written once after analysing rag-v1's failures on this same question set (missing
+    # citations, citing unretrieved passages, dropped amounts/conditions, declining when a
+    # passage did address the request). Not iterated against the results.
+    "rag-v3": {
+        "system": (
+            "You are the customer support assistant for Kestrel Home Goods. Follow these rules:\n"
+            "1. Use ONLY the policy passages provided. Do not invent policies, numbers, prices, "
+            "steps, or offers.\n"
+            "2. End every sentence with the id of the passage it is based on, in square "
+            "brackets, for example [KB-RET-01]. Only cite ids that appear in the passages "
+            "provided.\n"
+            "3. Reuse the passage's own wording, and include the exact numbers, fees, time limits "
+            "and conditions that apply (for example who qualifies and when).\n"
+            "4. If a passage explains what can or cannot be done about the customer's request, "
+            "answer with that, even if it is not what the customer hoped for.\n"
+            "5. Only if no passage addresses the question, reply exactly: "
+            f'"{ABSTAIN_SENTENCE}"\n'
+            "6. Answer in one to three sentences, without greetings or apologies."
+        ),
+        "user": "Policy passages:\n{passages}\n\nCustomer question: {question}",
+    },
+}
+
+
+# rag-v4: rag-v1's system prompt unchanged (including its refusal sentence) plus two examples
+# from an unrelated domain. Written once; not tuned on its results or on the prospective
+# questions in examples/rag/prospective/.
+PROMPTS["rag-v4"] = {
+    "system": PROMPTS["rag-v1"]["system"] + "\n\nExamples (a different organisation):\n"
+    "Passages:\n[LIB-1] Library: Books can be borrowed for 21 days.\n"
+    "Question: How long can I keep a book?\n"
+    "Answer: You can borrow books for 21 days [LIB-1].\n\n"
+    "Passages:\n[LIB-1] Library: Books can be borrowed for 21 days.\n"
+    "Question: Does the library have a cafe?\n"
+    f"Answer: {ABSTAIN_SENTENCE}",
+    "user": PROMPTS["rag-v1"]["user"],
+}
+
+
+# rag-v5: rag-v4 with ONE inserted paragraph (between rag-v1's rules and rag-v4's examples) to
+# reduce over-refusal while keeping conditional wording. Written once; not tuned on its results
+# or on examples/rag/prospective/kestrel_prospective_v2.json.
+_V5_PRINCIPLE = (
+    "\nIf a passage gives an applicable restriction, escalation procedure, or general-category "
+    "policy, answer with it, even when it does not grant the customer's request; include the "
+    'relevant conditions and cite the source. Keep conditional wording such as "may", '
+    '"might", or "subject to inspection" conditional; never turn it into a guarantee. '
+    "Refuse only when no passage addresses the question, and never invent missing policies or "
+    "benefits."
+)
+PROMPTS["rag-v5"] = {
+    "system": PROMPTS["rag-v1"]["system"]
+    + _V5_PRINCIPLE
+    + PROMPTS["rag-v4"]["system"][len(PROMPTS["rag-v1"]["system"]) :],
+    "user": PROMPTS["rag-v1"]["user"],
 }
 
 

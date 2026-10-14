@@ -33,7 +33,7 @@ flowchart LR
 time in their own process and post results to the API. The server stays deterministic and its
 memory stays small.
 
-## Deterministic RAG checks (methodology 1.3.0 in the working tree)
+## Deterministic RAG checks (methodology 2.0.0)
 
 Per RAG test case (`relevant_passage_ids` and/or `expect_abstain`), scored against the response's
 `retrieved_passage_ids` and the knowledge base stored in EvalOps (passage text sent by the client is
@@ -43,10 +43,10 @@ never trusted):
 |---|---|---|
 | Retrieval recall@k, reciprocal rank | share of gold passages in the retrieved top-k; 1/rank of the first gold passage | (metric only; gated at run level) |
 | Citations | `[KB-…]` markers parsed from the answer | a cited id does not exist, was not in the retrieved context, or an answer has no citation at all |
-| Claims | answer split into sentences/bullets; questions, courtesy filler, abstention sentences and fragments under 2 content words dropped | |
+| Claims | list markers removed before sentence splitting; questions, courtesy filler, and abstention sentences dropped; fragments under 2 content words dropped unless they contain a number | |
 | Lexical groundedness | a claim is *supported* if some retrieved passage covers ≥ 60% of its content words (stemmed, stopwords removed) **and** contains every number in the claim (`$9.95`, `30`, "thirty" → `30`) | supported claims / claims < `min_groundedness` (run config, default 0.8) |
 | Abstention | the answer contains a refusal phrase ("I don't have that information…") | the assistant answers an unanswerable question, or declines an answerable one |
-| Content (1.3.0) | a non-abstaining answer must contain an extracted checkable statement | the answer is empty, citation-only, or otherwise yields no checkable statement |
+| Content (1.4.0 onward) | alphanumeric text remains after citation stripping, independent of claim extraction | a non-abstaining answer is empty, punctuation-only, or citation-only |
 
 Run aggregates: `retrieval_recall_at_k`, `mrr`, `citation_validity_rate` (micro), `citation_support_rate`,
 `groundedness` (micro over claims), `unsupported_claim_count`, `abstention_accuracy`. Regression detection
@@ -54,11 +54,35 @@ tracks retrieval recall, citation validity, groundedness, and abstention accurac
 support are displayed separately. A changed knowledge base makes runs **not comparable**
 (passages are fingerprinted per run).
 
-Methodology 1.2.0 introduced the RAG checks. The pending 1.3.0 patch closes a loophole: a
-citation-only answer could pass because no claims were extracted and no groundedness check failed.
-It now fails `content`; recognized abstentions are exempt from this content check and still undergo
-abstention checking. For `q-opened-mattress`, this lowers v3 from 10/20 under 1.2.0 to **9/20 under
-1.3.0**. V1/v2 scores remain unchanged. No scoring thresholds or release gates were adjusted.
+### Content detection, numeric grounding, and version history
+
+1.2.0 introduced RAG checks but could pass citation-only output because no claim was extracted.
+1.3.0 added `content` failure for non-abstaining answers with zero extracted claims. It rejected
+citation-only output, but also rejected legitimate short numeric/non-Latin answers. For the
+recorded citation-only `q-opened-mattress` answer, v3 went from 10/20 under 1.2.0 to 9/20 under
+1.3.0; v1/v2 results in that audit were unchanged.
+
+1.4.0 separated meaningful content from claim extraction: alphanumeric text remaining after
+citation stripping passes the content check. Empty, punctuation-only, and citation-only output
+still fails unless it is a recognized abstention. Passing content detection is not proof of
+support: short numeric answers still produced no claims and therefore no grounding check.
+
+**2.0.0 closes that numeric grounding bypass.** Otherwise eligible segments containing numbers
+are kept even below the two-content-word minimum; numbered-list markers are removed before
+sentence splitting rather than treated as numeric claims. With a retrieved passage saying
+"30 days", `30 days [KB-RET-01]` is a supported claim; `60 days [KB-RET-01]` fails grounding
+when no supporting passage contains 60. Lexical coverage and exact-number thresholds stay the
+same. Non-Latin text remains meaningful content, but the English-oriented lexical heuristic does
+not thereby provide reliable multilingual or semantic verification.
+
+The legacy 1.3.0/1.4.0 minor labels are historical classifications, not a guarantee that identical
+short answers retained identical scores. See the
+[methodology-history clarification](evaluation-methodology.md#methodology-history-and-legacy-minor-labels).
+**2.0.0 is a major change and is incompatible with all 1.x runs.** Cross-major comparisons return
+not comparable, make no regression claim, and fail configured comparison gates closed. Retain
+original runs and rescore both baseline and candidate recordings under the same exact methodology,
+scoring config, dataset definitions, and knowledge base. Never relabel old scores to claim that
+new rules were applied. No release-gate thresholds or recordings are changed by this review.
 
 **Default RAG release policy**, applied by the report endpoint to runs that contain RAG cases. It was
 fixed **before any model output was generated**: retrieval recall ≥ 0.8, citation validity = 1.0,
@@ -100,7 +124,7 @@ kept, such as "I'm sorry to hear…"; excluded from the metrics below and report
 > calibration is re-run with `--reviewed-only`. Calibration reports record `label_status_counts`
 > and `labels_are_reviewed`, so a reviewed result can't be confused with this one.
 
-In the audited working tree, **5 of the 96 items are marked reviewed and 91 remain drafts**.
+As of this commit, **5 of the 96 items are marked reviewed and 91 remain drafts**.
 That status does not retroactively validate the saved calibration reports, which were measured
 against drafts. Human review and calibration on reviewed labels remain incomplete.
 
@@ -195,13 +219,13 @@ unsupported.
 - So the two signals are complementary. Neither is ground truth, which is why they're reported
   side by side and only the deterministic one feeds the default gates.
 
-## End-to-end results: all prompts rescored under methodology 1.3.0
+## Recorded results: historical same-version methodology 1.3.0 audit
 
-These are audited working-tree results. The v3 implementation, recordings, and methodology
-1.3.0 patch remain uncommitted; this documentation update does not include them. All three
-recordings were rescored with the same engine version, dataset, knowledge base, retrieved passage
-IDs, and scoring configuration. Their model revision and decoding settings also match. Stored
-v1/v2 runs in the developer database still say 1.2.0; they were not rewritten for this audit.
+The table preserves the earlier 1.3.0 audit: all three recordings were rescored with the same
+engine version, dataset, knowledge base, retrieved passage IDs, and scoring configuration. Model
+revision and decoding settings also matched. Original stored 1.x runs were not rewritten.
+Rescoring the same recordings under 2.0.0 left claims, metrics and failures identical for all 60
+responses, so the metrics and release-gate failures below also hold under 2.0.0.
 
 ### V1 versus the friendlier v2 candidate
 
@@ -262,8 +286,8 @@ Four v3 answers have no citations: `q-warranty-claim`, `q-ship-canada`, `q-cance
 and the mattress answer is citation-only. These remain failures despite the aggregate validity
 and groundedness gates passing.
 
-With v1 as baseline and the unchanged default policy, **five gates pass, three fail, and one is
-skipped**:
+In the historical same-version 1.3.0 audit, with v1 as baseline and the unchanged default policy,
+**five gates pass, three fail, and one is skipped**:
 
 | Gate | Threshold | V3 actual | Status |
 |---|---|---|---|
@@ -277,13 +301,13 @@ skipped**:
 | `min_groundedness` | ≥ 0.8 | 0.8 | pass |
 | `min_abstention_accuracy` | ≥ 1.0 | 0.85 | **fail** |
 
-The release verdict is **NOT READY FOR RELEASE**. Latency contributes to the comparison's
+That audited release verdict is **NOT READY FOR RELEASE**. Latency contributes to the comparison's
 regression verdict but is not a separate default release gate. The judge's higher estimate does
 not override the deterministic failures or these gates.
 
 ### Replay without a model
 
-With the pending v3 implementation and recordings available, run:
+To replay the recorded runs, run:
 
 ```bash
 make setup                   # hash-verified Python install and npm ci
@@ -294,10 +318,14 @@ make rag-demo                # terminal 3; default judge mode is replay
 
 Replay imports recorded answers and saved verdicts into the local database; it does not regenerate
 or rewrite the example files. Existing runs are reused by the demo script, so stored methodology
-versions are retained. Do not reset the database or relabel old runs to make a comparison appear
-same-version. The pending `tests/regression/test_rag_golden.py` fixtures rescore all three recordings
-with the current engine in isolated test databases and pin the results above. The committed Task 2
-baseline includes v1/v2 recordings only. See the [three-minute demo](demo-3-minute.md).
+versions are retained. Under 2.0.0, selecting an existing 1.x baseline and a new 2.x candidate
+produces **not comparable**, not the historical regression verdict above. Replay may reuse old
+runs; it is not a guarantee that both were rescored with the current engine. For a current
+comparison, submit the existing baseline and candidate recordings as new 2.0.0 runs with matching
+configuration and evidence. Do not reset the database, relabel old runs, or regenerate recordings.
+`tests/regression/test_rag_golden.py` rescores the recorded v1/v2/v3 answers with the current
+engine in isolated test databases and pins the results above. The [three-minute demo](demo-3-minute.md) remains a historical
+1.3.0 walkthrough; check stored versions before following its comparison steps.
 
 ## Benchmarks on this Mac (measured)
 
@@ -355,8 +383,7 @@ library versions, machine, prompt version and SHA-256 of the prompt template, de
 throughput, finish reason and peak memory. The knowledge base is fingerprinted per run, and judge
 grades carry the judge model, revision, prompt version and hash. Greedy decoding is deterministic for
 a fixed model, prompt and MLX version on the same machine. It has not been verified across machines
-or library versions. V1/v2 outputs are committed and replayed in tests; the pending v3 recording
-is present only in the working tree until its implementation/data changes are reviewed separately.
+or library versions. The recorded v1–v5 outputs are committed and replayed in tests.
 
 ## Limitations
 
@@ -378,3 +405,82 @@ is present only in the working tree until its implementation/data changes are re
   the question, and the knowledge base itself can be wrong.
 - The **abstention check** recognises a fixed set of refusal phrases. A creative refusal is scored
   as an answer.
+
+## Prompt experiments v4 and v5 (methodology 2.0.0)
+
+Each prompt was written once and generated once with the same model revision, BM25 retrieval
+(k = 3) and decoding (greedy, max 256 tokens); scores are same-version 2.0.0 rescoring of the
+recordings. `rag-v4` is `rag-v1` verbatim plus two library-domain examples (one cited answer, one
+refusal). `rag-v5` is `rag-v4` plus one paragraph: answer with applicable restrictions, keep
+conditional wording, refuse only when no passage addresses the question.
+
+**Development set (the same 20 questions, used repeatedly for prompt development; optimistic):**
+
+| | v1 | v3 | v4 | v5 |
+|---|---|---|---|---|
+| Passed | 9/20 | 9/20 | 11/20 | 12/20 |
+| Abstention accuracy | 0.90 | 0.85 | 0.75 | 0.75 |
+| Citation validity | 0.90 | 1.00 | 1.00 | 1.00 |
+| Answers with ≥1 citation | 10/15 | 14/20 | 11/12 | 12/12 |
+| Lexical groundedness / unsupported claims | 0.78 / 4 | 0.80 / 6 | 0.82 / 3 | 0.82 / 3 |
+| Latency p50 / p95 (ms) | 636 / 965 | 825 / 1219 | 717 / 1073 | 826 / 1099 |
+| Release verdict (baseline v1) | NOT READY | NOT READY | NOT READY | NOT READY |
+
+v4 and v5 decline all three unanswerable questions that v3 answered, but they also decline
+answerable ones. v5 still declines `q-card-in-chat`, `q-late-credit` and `q-white-glove` even
+though their gold passage was retrieved, and still states "No, we do not ship a new dresser right
+away" where the policy only says an inspection *may* be scheduled. Both fail `min_pass_rate`,
+`max_regressed_cases` and `min_abstention_accuracy`.
+
+**Prospective checks (frozen before each prompt was written; tiny, not a representative benchmark):**
+
+| Set | Questions | Scorer result | Human reading |
+|---|---|---|---|
+| v4: `prospective/kestrel_prospective_unanswerable.json` | 4 unanswerable | 4/4 declined | 4/4 |
+| v5: `prospective/kestrel_prospective_v2.json` | 5 answerable + 3 unanswerable | 8/8 passed | **7/8**: the custom-made sofa answer contradicts the policy (below) |
+
+The v4 prospective result can't separate abstention skill from v4's general tendency to refuse.
+Evidence: `examples/rag/experiments/rag-v{4,5}_evaluation.json`. Each saved section can be
+re-checked without a model:
+
+```sh
+backend/.venv/bin/python backend/scripts/rag_experiment_eval.py \
+  --recording examples/rag/responses/qwen2.5-1.5b_rag-v5.json \
+  --dataset examples/rag/kestrel_policy_kb.json \
+  --experiment examples/rag/experiments/rag-v5_evaluation.json
+```
+
+## Known limitation: custom-made sofa contradiction passes lexical scoring
+
+**KNOWN LIMITATION, not a correctness claim.** In the existing v5 prospective recording,
+`q-p2-custom-sofa-return` asks: "Can I return a custom-made sofa?" The recorded answer is:
+
+> Yes, you can return a custom-made sofa within 30 days of delivery for a full refund to the
+> original payment method [KB-RET-01].
+
+The first retrieved passage, `KB-RET-02`, explicitly says custom-made furniture "cannot be
+returned". The policy-consistent answer is **No**, citing that exclusion. The other retrieved
+passages are `KB-RET-03` (return shipping fees) and `KB-RET-01` (the general return window for
+most items). The general rule does not override the custom-made-furniture exception.
+
+Under methodology 2.0.0, this recorded answer nevertheless **passes with no failures**, lexical
+groundedness **1.0**, and one valid citation. Its claim overlaps the general `KB-RET-01` passage
+at **66.7% coverage**, exceeding the existing 60% lexical threshold; the number 30 also matches.
+The scorer selects that passage as lexical support. It does not reason about the exclusion in
+`KB-RET-02`, semantic negation, or the scope of "most items". The case has no reference-answer
+or required/forbidden-term check to independently catch the contradiction. Citation validity and
+successful retrieval therefore do not establish answer correctness.
+
+Reproduce only this observed false positive, without inference or changing recordings:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 backend/.venv/bin/pytest -p no:cacheprovider \
+  tests/regression/test_rag_known_limitations.py::test_known_limitation_custom_sofa_contradiction_passes_lexical_scoring
+```
+
+The [focused regression test](../tests/regression/test_rag_known_limitations.py) loads only this
+case and its recorded retrieved evidence. It documents an evaluator limitation; if semantic
+validation is later introduced, review and update or retire its false-pass assertions rather
+than preserve incorrect behavior to keep the test green. Human review must check the actual
+policy, its exceptions, and whether the answer addresses the question. Lexical pass rates do
+not detect semantic contradictions, and this example does not change gates, thresholds, or labels.

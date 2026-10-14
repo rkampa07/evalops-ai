@@ -1,0 +1,407 @@
+{
+  "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+  "prompt_version": "rag-v5",
+  "label": "Qwen2.5-1.5B-Instruct-4bit with prompt rag-v5",
+  "config": {
+    "min_token_f1": 0.5,
+    "min_groundedness": 0.8
+  },
+  "generation": {
+    "backend": "mlx",
+    "model_id": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "model_revision": "8b403126fc14f14cfc99bb4cfa72ecbc129ea677",
+    "mlx": "0.32.3",
+    "mlx_lm": "0.32.0",
+    "machine": "arm64",
+    "platform": "macOS-27.0.1",
+    "prompt_version": "rag-v5",
+    "prompt_hash": "0cb9aaf388d4cea97a6c056629b0ef962ecb653d7287070b33ddf932104af1e5",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 256,
+      "seed": 0
+    },
+    "retrieval": {
+      "retriever": "bm25",
+      "k": 3,
+      "k1": 1.5,
+      "b": 0.75
+    },
+    "knowledge_base": "kestrel_policy_kb.json",
+    "generated_at": "2026-10-14T00:56:02+00:00",
+    "evalops_methodology_at_generation": "2.0.0"
+  },
+  "benchmark": {
+    "questions": 20,
+    "model_load_seconds": 0.95,
+    "warmup_latency_ms": 939.9,
+    "total_generation_seconds": 16.89,
+    "latency_ms_p50": 821.0,
+    "latency_ms_max": 1164.9,
+    "peak_metal_memory_mb": 1458.3,
+    "process_max_rss_mb": 319.6,
+    "process_rss_before_model_load_mb": 29.8
+  },
+  "responses": [
+    {
+      "case_key": "q-return-window",
+      "output": "You have 30 days to return a sofa you bought [KB-RET-01].",
+      "latency_ms": 850.1,
+      "retrieved_passage_ids": [
+        "KB-RET-01",
+        "KB-RET-03",
+        "KB-RET-04"
+      ],
+      "generation": {
+        "latency_ms": 850.1,
+        "prompt_tokens": 431,
+        "completion_tokens": 21,
+        "tokens_per_second": 79.41,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1436.9
+      }
+    },
+    {
+      "case_key": "q-opened-mattress",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 702.7,
+      "retrieved_passage_ids": [
+        "KB-SUP-01",
+        "KB-RET-03",
+        "KB-RET-01"
+      ],
+      "generation": {
+        "latency_ms": 702.7,
+        "prompt_tokens": 428,
+        "completion_tokens": 11,
+        "tokens_per_second": 92.64,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1436.9
+      }
+    },
+    {
+      "case_key": "q-return-fee",
+      "output": "No, you do not have to pay for return shipping on a $60 order [KB-RET-03].",
+      "latency_ms": 888.8,
+      "retrieved_passage_ids": [
+        "KB-RET-03",
+        "KB-ORD-02",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 888.8,
+        "prompt_tokens": 437,
+        "completion_tokens": 26,
+        "tokens_per_second": 88.03,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-refund-timing",
+      "output": "Refunds are issued within 5 business days after the returned item arrives at our warehouse. Banks may take an additional 3 to 7 business days to post the refund. [KB-RET-04]",
+      "latency_ms": 1095.9,
+      "retrieved_passage_ids": [
+        "KB-RET-04",
+        "KB-RET-01",
+        "KB-RET-03"
+      ],
+      "generation": {
+        "latency_ms": 1095.9,
+        "prompt_tokens": 431,
+        "completion_tokens": 44,
+        "tokens_per_second": 86.14,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-damaged-lamp",
+      "output": "You should upload a photo of the damaged lamp on the Orders page within 14 days of delivery. We will ship a free replacement or issue a full refund. [KB-DMG-01]",
+      "latency_ms": 1081.9,
+      "retrieved_passage_ids": [
+        "KB-WAR-02",
+        "KB-WAR-01",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 1081.9,
+        "prompt_tokens": 429,
+        "completion_tokens": 43,
+        "tokens_per_second": 85.95,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-damaged-dresser",
+      "output": "No, we do not ship a new dresser right away. [KB-DMG-02]",
+      "latency_ms": 831.8,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-PAY-02",
+        "KB-RET-03"
+      ],
+      "generation": {
+        "latency_ms": 831.8,
+        "prompt_tokens": 422,
+        "completion_tokens": 22,
+        "tokens_per_second": 88.09,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-pet-damage",
+      "output": "No, the furniture warranty does not cover normal wear, misuse, pet damage, or accidental damage. [KB-WAR-01]",
+      "latency_ms": 876.9,
+      "retrieved_passage_ids": [
+        "KB-WAR-01",
+        "KB-WAR-02",
+        "KB-RET-02"
+      ],
+      "generation": {
+        "latency_ms": 876.9,
+        "prompt_tokens": 412,
+        "completion_tokens": 29,
+        "tokens_per_second": 87.27,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-led-bulb",
+      "output": "The LED bulb sold separately is covered for 90 days [KB-WAR-02].",
+      "latency_ms": 821.0,
+      "retrieved_passage_ids": [
+        "KB-WAR-02",
+        "KB-WAR-01",
+        "KB-DMG-01"
+      ],
+      "generation": {
+        "latency_ms": 821.0,
+        "prompt_tokens": 432,
+        "completion_tokens": 21,
+        "tokens_per_second": 88.27,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-warranty-claim",
+      "output": "To file a warranty claim for a wobbly chair, contact support with your order number and photos of the defect. Approved claims receive a repair kit, a replacement part, or a replacement item. [KB-WAR-03]",
+      "latency_ms": 1164.9,
+      "retrieved_passage_ids": [
+        "KB-WAR-03",
+        "KB-WAR-02",
+        "KB-WAR-01"
+      ],
+      "generation": {
+        "latency_ms": 1164.9,
+        "prompt_tokens": 421,
+        "completion_tokens": 49,
+        "tokens_per_second": 85.14,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-ship-canada",
+      "output": "Yes, we ship to Canada. Canadian orders usually arrive in 7 to 12 business days. [KB-SHP-02]",
+      "latency_ms": 891.9,
+      "retrieved_passage_ids": [
+        "KB-SHP-02",
+        "KB-SHP-01",
+        "KB-PAY-01"
+      ],
+      "generation": {
+        "latency_ms": 891.9,
+        "prompt_tokens": 415,
+        "completion_tokens": 30,
+        "tokens_per_second": 86.46,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-ship-uk",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 701.1,
+      "retrieved_passage_ids": [
+        "KB-ORD-02",
+        "KB-RET-03",
+        "KB-ORD-01"
+      ],
+      "generation": {
+        "latency_ms": 701.1,
+        "prompt_tokens": 421,
+        "completion_tokens": 11,
+        "tokens_per_second": 91.68,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-white-glove",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 662.0,
+      "retrieved_passage_ids": [
+        "KB-SHP-03",
+        "KB-ORD-02",
+        "KB-RET-01"
+      ],
+      "generation": {
+        "latency_ms": 662.0,
+        "prompt_tokens": 413,
+        "completion_tokens": 11,
+        "tokens_per_second": 92.86,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-cancel-order",
+      "output": "Yes, you can cancel your order within 1 hour of purchase from the Orders page. After that, contact support; changes are not guaranteed once an order ships. [KB-ORD-01]",
+      "latency_ms": 1076.8,
+      "retrieved_passage_ids": [
+        "KB-ORD-01",
+        "KB-SHP-01",
+        "KB-DMG-02"
+      ],
+      "generation": {
+        "latency_ms": 1076.8,
+        "prompt_tokens": 418,
+        "completion_tokens": 42,
+        "tokens_per_second": 85.86,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-card-in-chat",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 668.5,
+      "retrieved_passage_ids": [
+        "KB-PAY-01",
+        "KB-RET-02",
+        "KB-WAR-03"
+      ],
+      "generation": {
+        "latency_ms": 668.5,
+        "prompt_tokens": 415,
+        "completion_tokens": 11,
+        "tokens_per_second": 89.36,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-price-drop",
+      "output": "Yes, you can request a price adjustment for the difference. [KB-PAY-02]",
+      "latency_ms": 817.8,
+      "retrieved_passage_ids": [
+        "KB-PAY-02",
+        "KB-RET-04",
+        "KB-SHP-01"
+      ],
+      "generation": {
+        "latency_ms": 817.8,
+        "prompt_tokens": 419,
+        "completion_tokens": 21,
+        "tokens_per_second": 88.1,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-late-credit",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 703.8,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-SUP-02",
+        "KB-SHP-03"
+      ],
+      "generation": {
+        "latency_ms": 703.8,
+        "prompt_tokens": 418,
+        "completion_tokens": 11,
+        "tokens_per_second": 90.19,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1443.6
+      }
+    },
+    {
+      "case_key": "q-rewards-points",
+      "output": "You need 500 Kestrel Rewards points to redeem a $10 reward. [KB-MEM-01]",
+      "latency_ms": 951.5,
+      "retrieved_passage_ids": [
+        "KB-MEM-01",
+        "KB-DMG-01",
+        "KB-SUP-01"
+      ],
+      "generation": {
+        "latency_ms": 951.5,
+        "prompt_tokens": 451,
+        "completion_tokens": 28,
+        "tokens_per_second": 86.25,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1458.3
+      }
+    },
+    {
+      "case_key": "q-showroom-hours",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 700.5,
+      "retrieved_passage_ids": [
+        "KB-SUP-01",
+        "KB-PAY-02",
+        "KB-SAF-01"
+      ],
+      "generation": {
+        "latency_ms": 700.5,
+        "prompt_tokens": 421,
+        "completion_tokens": 11,
+        "tokens_per_second": 92.24,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1458.3
+      }
+    },
+    {
+      "case_key": "q-gift-wrap",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 664.9,
+      "retrieved_passage_ids": [
+        "KB-RET-02",
+        "KB-ORD-01",
+        "KB-ORD-02"
+      ],
+      "generation": {
+        "latency_ms": 664.9,
+        "prompt_tokens": 408,
+        "completion_tokens": 11,
+        "tokens_per_second": 92.38,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1458.3
+      }
+    },
+    {
+      "case_key": "q-financing",
+      "output": "I don't have that information in our policies.",
+      "latency_ms": 679.9,
+      "retrieved_passage_ids": [
+        "KB-DMG-02",
+        "KB-PAY-02",
+        "KB-ORD-01"
+      ],
+      "generation": {
+        "latency_ms": 679.9,
+        "prompt_tokens": 413,
+        "completion_tokens": 11,
+        "tokens_per_second": 85.81,
+        "finish_reason": "stop",
+        "peak_memory_mb": 1458.3
+      }
+    }
+  ]
+}

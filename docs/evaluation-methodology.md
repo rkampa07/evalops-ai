@@ -88,25 +88,30 @@ Latency is **reported by the client** (`latency_ms` per response); EvalOps does 
 
 Cases with no submitted response are scored as failures (`missing_response`) and count in the pass-rate denominator. Responses referencing unknown case keys are rejected with 422 so typos can't silently drop cases.
 
-### RAG checks (methodology 1.3.0 in the working tree)
+### RAG checks (methodology 2.0.0)
 
 Cases with `relevant_passage_ids` or `expect_abstain` also get retrieval, citation, lexical
 groundedness and abstention checks against the dataset's knowledge-base passages. Model-judge
 verdicts are a separate, estimated category. Full definitions, measured error rates and limitations
 are in [rag-evaluation.md](rag-evaluation.md).
 
-Methodology 1.2.0 introduced these RAG checks. The pending 1.3.0 change adds a `content`
-failure when a non-abstaining answer contains no extracted checkable statement, including empty
-or citation-only output. A recognized abstention is exempt from this content check but still
-undergoes the abstention check. This closes a case-pass loophole; it does not change citation,
-groundedness, or release-gate thresholds.
+Meaningful content and extractable claims are distinct. A non-abstaining empty, punctuation-only,
+or citation-only answer fails `content`. Short numeric and non-Latin text count as meaningful
+content; this does not mean that they are grounded or factually correct. Recognized abstentions
+are exempt from the content check but still undergo abstention checking.
 
-Rescoring all three recorded prompts with the same 1.3.0 engine yields v1 **9/20**, v2 **3/20**,
-and v3 **9/20**. Under 1.2.0, v3 was **10/20** because `q-opened-mattress` contains only
-citation markers; v1/v2 scores are unchanged. These figures describe the audited working tree,
-not implementation changes included in this documentation update. Existing stored runs keep
-their recorded methodology version; comparisons across minor versions show a warning. Use
-same-version rescoring for a like-for-like assessment rather than relabelling stored scores.
+In 2.0.0, otherwise eligible short segments containing numbers are extracted as claims even with
+fewer than two content words. Numbered-list markers are removed before sentence splitting.
+For evidence saying returns are accepted within 30 days, `30 days [KB-RET-01]` is extracted and
+supported, whereas `60 days [KB-RET-01]` is extracted and fails groundedness because 60 is missing
+from the evidence. Existing lexical coverage and exact-number thresholds are unchanged; this
+is not semantic verification of a number's meaning or whether the answer addresses the question.
+
+The earlier same-version **1.3.0 audit** found v1 **9/20**, v2 **3/20**, and v3 **9/20**. Under
+1.2.0, v3 was **10/20** because citation-only `q-opened-mattress` passed. These historical results
+are retained. Rescoring the same recordings under 2.0.0 left claims, metrics and failures identical
+for all 60 recorded responses (v1 **9/20**, v2 **3/20**, v3 **9/20**). Existing stored runs retain
+their original scores and methodology metadata.
 
 ## Run-level aggregates
 
@@ -150,6 +155,13 @@ When runs are **not comparable**, the comparison returns `compatible: false`,
 Comparison gates (`max_pass_rate_drop`, `max_regressed_cases`) **fail closed** with a
 "not comparable" message. The release is blocked, but no regression is claimed.
 
+Methodology **2.0.0 versus any 1.x version is incompatible in either direction**. This holds even
+when the specific answers happen to receive identical scores. To assess model or prompt changes,
+submit both baseline and candidate recordings as new runs scored by the **same exact methodology
+version**, with matching scoring configuration, dataset definitions, and knowledge base. Preserve
+original runs; do not relabel their methodology versions or regenerate answers just to compare them.
+A same-major warning alone is not evidence that historical 1.3.0/1.4.0 scores are identical.
+
 When comparable, aggregate metric deltas are **recomputed over the comparable cases only**, so
 an edited, added or removed case can't move the baseline or candidate averages. A run's own
 gates (`min_pass_rate`, etc.) still use its full summary.
@@ -167,11 +179,27 @@ gates (`min_pass_rate`, etc.) still use its full summary.
 - **Methodology** (`engine/versioning.py`, semver): MAJOR = scores may change for the same
   inputs (not comparable); MINOR = additive/robustness changes that leave well-formed inputs'
   scores unchanged; PATCH = no scoring impact. 1.0.0 → 1.1.0 added time-limited regex
-  evaluation; 1.2.0 added RAG evidence checks; the pending 1.3.0 change rejects
-  empty/citation-only non-abstaining RAG answers as described above.
+  evaluation; the subsequent RAG changes and historical classification caveat are below.
 - **Pre-existing data** (migration `0002`): runs are marked methodology `1.0.0`. A legacy
   result gets a definition hash only if its test case still exists and was not modified after
   the run; otherwise its definition is recorded as unknown rather than guessed.
+
+### Methodology history and legacy minor labels
+
+| Version | Scoring change |
+|---|---|
+| 1.2.0 | Introduced retrieval, citation, lexical grounding, and abstention checks. |
+| 1.3.0 | Added `content` failure for non-abstaining output with no extracted claim; this correctly rejected citation-only output but also rejected short factual answers. |
+| 1.4.0 | Based `content` on alphanumeric text remaining after citation stripping, accepting short numeric/non-Latin content while still rejecting empty/punctuation/citation-only output. Short numeric claims could still bypass grounding. |
+| 2.0.0 | Extracts short numeric claims and removes numbered-list markers before sentence splitting; unsupported numeric answers can now fail. This is a major scoring change, incompatible with 1.x. |
+
+The historical **1.3.0 and 1.4.0 minor classifications need this qualification**: they changed
+pass/fail for some identical inputs, including legitimate short answers. They were recorded as
+robustness fixes, but do not establish a universal "well-formed scores unchanged" guarantee under
+the policy above. These are legacy labels, not a reason to rewrite stored history. The runtime
+still allows differing 1.x versions with a warning; that mechanical compatibility can confound
+model regressions with scorer changes. Use same-version rescoring for trustworthy comparisons.
+The 2.0.0 major bump explicitly avoids assuming compatibility for the new numeric grounding rule.
 
 **Per case** (`regression.compare_runs`):
 
@@ -211,10 +239,14 @@ Rules:
 **Default release policy** (used by the report endpoint): `min_pass_rate 0.9`, `max_forbidden_violations 0`, `min_schema_pass_rate 1.0`, plus `max_pass_rate_drop 0` and `max_regressed_cases 0` when a baseline is supplied. When no baseline is given, the report says regression detection was not performed.
 
 For RAG runs, the report also requires retrieval recall ≥ 0.8, citation validity ≥ 1.0, lexical
-groundedness ≥ 0.8, and abstention accuracy ≥ 1.0. V3 versus v1 under methodology 1.3.0 fails
+groundedness ≥ 0.8, and abstention accuracy ≥ 1.0. The historical same-version 1.3.0 audit of
+v3 versus v1 failed
 `min_pass_rate` (0.45 < 0.9), `min_abstention_accuracy` (0.85 < 1.0), and
 `max_regressed_cases` (3 > 0): five gates pass, three fail, and the inapplicable schema gate is
-skipped. P95 latency regresses in the comparison, but is not a separate default release gate.
+skipped. P95 latency regressed in that comparison, but is not a separate default release gate.
+These failures and thresholds are preserved. Comparing a stored 1.x baseline with a new 2.0.0
+candidate instead fails the configured comparison gates as **not comparable**; it does not
+reproduce the historical three-case regression count. Rescore both versions before assessing it.
 
 ## Reproducibility
 

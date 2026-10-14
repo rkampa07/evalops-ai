@@ -25,7 +25,7 @@ def rag_runs(client):
     client.post(f"/datasets/{ds['id']}/passages", json={"passages": kb["passages"]})
     client.post(f"/datasets/{ds['id']}/test-cases/bulk", json={"test_cases": kb["test_cases"]})
     runs = {}
-    for version in ("rag-v1", "rag-v2"):
+    for version in ("rag-v1", "rag-v2", "rag-v3"):
         record = load(f"responses/qwen2.5-1.5b_{version}.json")
         body = {
             k: record[k] for k in ("model_name", "prompt_version", "label", "config", "generation")
@@ -52,6 +52,9 @@ GOLDEN = {
     "rag-v2": {"passed_cases": 3, "groundedness": 0.521739, "abstention_accuracy": 0.85,
                "citation_validity_rate": 0.916667, "retrieval_recall_at_k": 0.852941,
                "unsupported_claim_count": 22, "estimated_groundedness": 0.304348},
+    "rag-v3": {"passed_cases": 9, "groundedness": 0.8, "abstention_accuracy": 0.85,
+               "citation_validity_rate": 1.0, "retrieval_recall_at_k": 0.852941,
+               "unsupported_claim_count": 6, "estimated_groundedness": 0.533333},
 }  # fmt: skip
 
 
@@ -90,3 +93,29 @@ def test_candidate_prompt_regression_detected_and_gated(client, rag_runs):
     assert rep["readiness"] == "not_ready"
     failed = {g["gate"] for g in rep["gate_evaluation"]["gates"] if g["status"] == "fail"}
     assert {"min_groundedness", "max_regressed_cases", "min_abstention_accuracy"} <= failed
+
+
+def test_rag_v3_improves_evidence_but_still_fails_the_predefined_gates(client, rag_runs):
+    """rag-v3 was written once to fix rag-v1's failures. It improves citations and lexical
+    groundedness, but answers all three unanswerable questions, so it is NOT release-ready."""
+    b, c = rag_runs["rag-v1"]["id"], rag_runs["rag-v3"]["id"]
+    cmp = client.get(
+        "/evaluations/compare", params={"baseline_run_id": b, "candidate_run_id": c}
+    ).json()
+    regressed = {x["case_key"] for x in cmp["case_changes"] if x["change"] == "regressed"}
+    assert regressed == {"q-showroom-hours", "q-gift-wrap", "q-financing"}
+    statuses = {d["metric"]: d["status"] for d in cmp["metric_deltas"]}
+    assert statuses["citation_validity_rate"] == "improved"
+    assert statuses["abstention_accuracy"] == "regressed"
+
+    rep = client.get(f"/evaluations/runs/{c}/report", params={"baseline_run_id": b}).json()
+    gates = {g["gate"]: g["status"] for g in rep["gate_evaluation"]["gates"]}
+    assert rep["readiness"] == "not_ready"
+    assert gates["min_citation_validity"] == "pass" and gates["min_groundedness"] == "pass"
+    assert gates["min_abstention_accuracy"] == "fail" and gates["max_regressed_cases"] == "fail"
+
+
+def test_degenerate_rag_v3_answer_fails_content_check(rag_runs):
+    result = next(r for r in rag_runs["rag-v3"]["results"] if r["case_key"] == "q-opened-mattress")
+    assert result["passed"] is False
+    assert [f["check"] for f in result["failures"]] == ["content"]

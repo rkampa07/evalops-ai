@@ -1,0 +1,289 @@
+{
+  "judge": {
+    "model_id": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+    "model_revision": "7f0dc925e0d0afb0322d96f9255cfddf2ba5636e",
+    "backend": "mlx",
+    "prompt_version": "judge-v2",
+    "prompt_hash": "92cdf55b31a66c4f6c484ba492e3e6c801b8d5291750822d68883a09c0a03afe",
+    "settings": {
+      "temperature": 0.0,
+      "max_tokens": 4,
+      "seed": 0
+    }
+  },
+  "grades": [
+    {
+      "case_key": "q-cancel-order",
+      "claims": [
+        {
+          "claim": "Yes, you can cancel your order within 1 hour of purchase from the Orders page.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "After that, contact support; changes are not guaranteed once an order ships.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2324.0
+    },
+    {
+      "case_key": "q-card-in-chat",
+      "claims": [
+        {
+          "claim": "No, you cannot give us your card number in chat to pay.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Payments must be made through the secure checkout on our website.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2057.4
+    },
+    {
+      "case_key": "q-damaged-dresser",
+      "claims": [
+        {
+          "claim": "No, for damaged large furniture, a carrier inspection is scheduled within 3 business days before a replacement ship.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1035.8
+    },
+    {
+      "case_key": "q-damaged-lamp",
+      "claims": [
+        {
+          "claim": "If your lamp arrived broken, you should upload a photo on the Orders page within 14 days of delivery.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "We will ship a free replacement or issue a full refund.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "There is no need to return the damaged item.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 3268.1
+    },
+    {
+      "case_key": "q-financing",
+      "claims": [
+        {
+          "claim": "No, we do not offer 0% financing on furniture purchases.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1218.5
+    },
+    {
+      "case_key": "q-gift-wrap",
+      "claims": [
+        {
+          "claim": "No, gift wrapping is not offered for orders.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1386.6
+    },
+    {
+      "case_key": "q-late-credit",
+      "claims": [
+        {
+          "claim": "Compensation requests: Support agents and the assistant cannot promise credits, discounts, or compensation.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        },
+        {
+          "claim": "Requests for compensation are escalated to a support specialist, who replies within 2 business days.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 3034.1
+    },
+    {
+      "case_key": "q-led-bulb",
+      "claims": [
+        {
+          "claim": "The LED bulb you bought separately is covered for 90 days under the warranty.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1241.0
+    },
+    {
+      "case_key": "q-pet-damage",
+      "claims": [
+        {
+          "claim": "The furniture warranty covers manufacturing defects such as broken joints or faulty hardware.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "It does not cover normal wear, misuse, or accidental damage.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 2376.5
+    },
+    {
+      "case_key": "q-price-drop",
+      "claims": [
+        {
+          "claim": "Yes, you can request a price adjustment for the difference in price.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1396.4
+    },
+    {
+      "case_key": "q-refund-timing",
+      "claims": [
+        {
+          "claim": "Refunds are issued within 5 business days after the returned item arrives at our warehouse.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Banks may take an additional 3 to 7 business days to post the refund.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2419.9
+    },
+    {
+      "case_key": "q-return-fee",
+      "claims": [
+        {
+          "claim": "No, you do not have to pay for return shipping on a $60 order.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1287.3
+    },
+    {
+      "case_key": "q-return-window",
+      "claims": [
+        {
+          "claim": "You have 30 days to return a sofa you bought from Kestrel Home Goods.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1322.0
+    },
+    {
+      "case_key": "q-rewards-points",
+      "claims": [
+        {
+          "claim": "To earn a $10 reward, you need to accumulate 500 points.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 1402.2
+    },
+    {
+      "case_key": "q-ship-canada",
+      "claims": [
+        {
+          "claim": "Yes, we ship to Canada.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Canadian orders usually arrive in 7 to 12 business days.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Duties and taxes are collected at checkout.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 4263.1
+    },
+    {
+      "case_key": "q-ship-uk",
+      "claims": [
+        {
+          "claim": "Orders can be changed or cancelled within 1 hour of purchase from the Orders page.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "After that, contact support; changes are not guaranteed once an order ships.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2817.4
+    },
+    {
+      "case_key": "q-showroom-hours",
+      "claims": [
+        {
+          "claim": "The Seattle showroom opens at 10 am on Saturdays.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1591.2
+    },
+    {
+      "case_key": "q-warranty-claim",
+      "claims": [
+        {
+          "claim": "To file a warranty claim for a wobbly chair, contact support with your order number and photos of the defect.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        },
+        {
+          "claim": "Approved claims receive a repair kit, a replacement part, or a replacement item.",
+          "verdict": "supported",
+          "raw": "SUPPORTED"
+        }
+      ],
+      "latency_ms": 2765.0
+    },
+    {
+      "case_key": "q-white-glove",
+      "claims": [
+        {
+          "claim": "White-glove delivery for a bookshelf is available for a $129 fee.",
+          "verdict": "unsupported",
+          "raw": "UNSUPPORTED"
+        }
+      ],
+      "latency_ms": 1348.3
+    }
+  ],
+  "graded_run": {
+    "model_name": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+    "prompt_version": "rag-v3"
+  },
+  "benchmark": {
+    "model_load_seconds": 1.92,
+    "total_seconds": 39.15,
+    "claims": 30
+  }
+}

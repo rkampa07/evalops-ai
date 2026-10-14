@@ -1,0 +1,286 @@
+{
+  "methodology_version": "2.0.0",
+  "note": "All runs rescored from recordings under the same methodology; recordings not modified.",
+  "development_set": {
+    "rag-v1": {
+      "passed": "9/20",
+      "pass_rate": 0.45,
+      "abstention_accuracy": 0.9,
+      "citation_validity_rate": 0.9,
+      "answers_with_citation": "10/15",
+      "claims_with_citation": "1/18",
+      "groundedness": 0.777778,
+      "unsupported_claim_count": 4,
+      "latency_p50_ms": 635.9,
+      "latency_p95_ms": 964.8,
+      "failures": {
+        "q-cancel-order": [
+          "citations"
+        ],
+        "q-card-in-chat": [
+          "required_terms",
+          "groundedness"
+        ],
+        "q-late-credit": [
+          "required_terms",
+          "abstention"
+        ],
+        "q-opened-mattress": [
+          "groundedness"
+        ],
+        "q-return-fee": [
+          "required_terms",
+          "citations",
+          "groundedness"
+        ],
+        "q-return-window": [
+          "groundedness"
+        ],
+        "q-rewards-points": [
+          "citations"
+        ],
+        "q-ship-canada": [
+          "citations"
+        ],
+        "q-ship-uk": [
+          "abstention"
+        ],
+        "q-warranty-claim": [
+          "citations"
+        ],
+        "q-white-glove": [
+          "citations"
+        ]
+      }
+    },
+    "rag-v3": {
+      "passed": "9/20",
+      "pass_rate": 0.45,
+      "abstention_accuracy": 0.85,
+      "citation_validity_rate": 1.0,
+      "answers_with_citation": "14/20",
+      "claims_with_citation": "6/30",
+      "groundedness": 0.8,
+      "unsupported_claim_count": 6,
+      "latency_p50_ms": 825.4,
+      "latency_p95_ms": 1219.1,
+      "failures": {
+        "q-cancel-order": [
+          "citations"
+        ],
+        "q-card-in-chat": [
+          "groundedness"
+        ],
+        "q-financing": [
+          "abstention",
+          "groundedness"
+        ],
+        "q-gift-wrap": [
+          "abstention",
+          "groundedness"
+        ],
+        "q-opened-mattress": [
+          "content"
+        ],
+        "q-return-fee": [
+          "required_terms",
+          "groundedness"
+        ],
+        "q-return-window": [
+          "groundedness"
+        ],
+        "q-rewards-points": [
+          "citations"
+        ],
+        "q-ship-canada": [
+          "citations"
+        ],
+        "q-showroom-hours": [
+          "abstention",
+          "groundedness"
+        ],
+        "q-warranty-claim": [
+          "citations"
+        ]
+      }
+    },
+    "rag-v4": {
+      "passed": "11/20",
+      "pass_rate": 0.55,
+      "abstention_accuracy": 0.75,
+      "citation_validity_rate": 1.0,
+      "answers_with_citation": "11/12",
+      "claims_with_citation": "4/17",
+      "groundedness": 0.823529,
+      "unsupported_claim_count": 3,
+      "latency_p50_ms": 717.1,
+      "latency_p95_ms": 1072.8,
+      "failures": {
+        "q-card-in-chat": [
+          "required_terms",
+          "abstention"
+        ],
+        "q-damaged-dresser": [
+          "required_terms",
+          "groundedness"
+        ],
+        "q-late-credit": [
+          "required_terms",
+          "abstention"
+        ],
+        "q-opened-mattress": [
+          "abstention"
+        ],
+        "q-return-fee": [
+          "required_terms",
+          "groundedness"
+        ],
+        "q-return-window": [
+          "groundedness"
+        ],
+        "q-rewards-points": [
+          "citations"
+        ],
+        "q-ship-uk": [
+          "abstention"
+        ],
+        "q-white-glove": [
+          "required_terms",
+          "abstention"
+        ]
+      }
+    }
+  },
+  "comparisons": {
+    "rag-v1 -> rag-v4": {
+      "compatible": true,
+      "has_regression": true,
+      "regression_reasons": [
+        "1 case(s) went from pass to fail",
+        "required_terms_pass_rate regressed: 0.7692 -> 0.6154",
+        "abstention_accuracy regressed: 0.9 -> 0.75"
+      ],
+      "regressed": [
+        "q-damaged-dresser"
+      ],
+      "fixed": [
+        "q-cancel-order",
+        "q-ship-canada",
+        "q-warranty-claim"
+      ]
+    },
+    "rag-v3 -> rag-v4": {
+      "compatible": true,
+      "has_regression": true,
+      "regression_reasons": [
+        "4 case(s) went from pass to fail",
+        "required_terms_pass_rate regressed: 0.9231 -> 0.6154",
+        "abstention_accuracy regressed: 0.85 -> 0.75"
+      ],
+      "regressed": [
+        "q-damaged-dresser",
+        "q-late-credit",
+        "q-ship-uk",
+        "q-white-glove"
+      ],
+      "fixed": [
+        "q-cancel-order",
+        "q-financing",
+        "q-gift-wrap",
+        "q-ship-canada",
+        "q-showroom-hours",
+        "q-warranty-claim"
+      ]
+    }
+  },
+  "release_gates": {
+    "rag-v1": {
+      "readiness": "not_ready",
+      "baseline": null,
+      "failed_gates": [
+        "min_pass_rate",
+        "min_citation_validity",
+        "min_groundedness",
+        "min_abstention_accuracy"
+      ],
+      "passed_gates": [
+        "max_forbidden_violations",
+        "min_retrieval_recall"
+      ]
+    },
+    "rag-v3": {
+      "readiness": "not_ready",
+      "baseline": "rag-v1",
+      "failed_gates": [
+        "min_pass_rate",
+        "max_regressed_cases",
+        "min_abstention_accuracy"
+      ],
+      "passed_gates": [
+        "max_forbidden_violations",
+        "max_pass_rate_drop",
+        "min_retrieval_recall",
+        "min_citation_validity",
+        "min_groundedness"
+      ]
+    },
+    "rag-v4": {
+      "readiness": "not_ready",
+      "baseline": "rag-v1",
+      "failed_gates": [
+        "min_pass_rate",
+        "max_regressed_cases",
+        "min_abstention_accuracy"
+      ],
+      "passed_gates": [
+        "max_forbidden_violations",
+        "max_pass_rate_drop",
+        "min_retrieval_recall",
+        "min_citation_validity",
+        "min_groundedness"
+      ]
+    }
+  },
+  "prospective_check": {
+    "passed": "4/4",
+    "pass_rate": 1.0,
+    "abstention_accuracy": 1.0,
+    "citation_validity_rate": null,
+    "answers_with_citation": "0/0",
+    "claims_with_citation": "0/0",
+    "groundedness": null,
+    "unsupported_claim_count": 0,
+    "latency_p50_ms": 582.5,
+    "latency_p95_ms": 584.3,
+    "failures": {},
+    "outputs": {
+      "q-p-fabric-swatches": "I don't have that information in our policies.",
+      "q-p-mobile-app": "I don't have that information in our policies.",
+      "q-p-phone-number": "I don't have that information in our policies.",
+      "q-p-warehouse-pickup": "I don't have that information in our policies."
+    },
+    "frozen_questions_sha256": "e8a572cde71dcbb23507d7c61606b3c46bb7c1b50f65d863dbad91823d8f3931"
+  },
+  "rag_v4_outputs": {
+    "q-cancel-order": "You can change or cancel your order within 1 hour of purchase from the Orders page. After that, contact support; changes are not guaranteed once an order ships. [KB-ORD-01]",
+    "q-card-in-chat": "I don't have that information in our policies.",
+    "q-damaged-dresser": "No, we do not ship a new dresser right away. [KB-DMG-02]",
+    "q-damaged-lamp": "You should upload a photo of the damaged lamp on the Orders page within 14 days of delivery. We will ship a free replacement or issue a full refund, and you do not need to return the damaged item. [KB-DMG-01]",
+    "q-financing": "I don't have that information in our policies.",
+    "q-gift-wrap": "I don't have that information in our policies.",
+    "q-late-credit": "I don't have that information in our policies.",
+    "q-led-bulb": "Answer: An LED bulb sold separately is covered for 90 days [KB-WAR-01].",
+    "q-opened-mattress": "I don't have that information in our policies.",
+    "q-pet-damage": "No, the warranty does not cover normal wear, misuse, pet damage, or accidental damage. [KB-WAR-01]",
+    "q-price-drop": "Yes, you can request a price adjustment for the difference. [KB-PAY-02]",
+    "q-refund-timing": "Refunds are issued within 5 business days after the returned item arrives at our warehouse. Banks may take an additional 3 to 7 business days to post the refund. [KB-RET-04]",
+    "q-return-fee": "No, you do not have to pay for return shipping on a $60 order [KB-ORD-02].",
+    "q-return-window": "You have 30 days to return a sofa you bought [KB-RET-01].",
+    "q-rewards-points": "You need 500 Kestrel Rewards points to redeem a $10 reward.",
+    "q-ship-canada": "Yes, we ship to Canada. [KB-SHP-02] Canadian orders usually arrive in 7 to 12 business days.",
+    "q-ship-uk": "I don't have that information in our policies.",
+    "q-showroom-hours": "I don't have that information in our policies.",
+    "q-warranty-claim": "To file a warranty claim for a wobbly chair, contact support with your order number and photos of the defect. Approved claims receive a repair kit, a replacement part, or a replacement item. [KB-WAR-03]",
+    "q-white-glove": "I don't have that information in our policies."
+  }
+}

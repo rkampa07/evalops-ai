@@ -1,0 +1,157 @@
+{
+  "name": "kestrel-policy-rag-prospective-unanswerable-v1",
+  "description": "Prospective check: 4 questions the policy passages do not answer. Written and frozen BEFORE the rag-v4 prompt was written or any v4 output was generated; never used to tune any prompt. Same 20 passages as kestrel-policy-rag-v1.",
+  "frozen_at": "2026-10-14T00:49:25+00:00",
+  "passages": [
+    {
+      "passage_id": "KB-RET-01",
+      "title": "Return window",
+      "text": "Most items can be returned within 30 days of delivery for a full refund to the original payment method. Items must be unused and in their original packaging."
+    },
+    {
+      "passage_id": "KB-RET-02",
+      "title": "Non-returnable items",
+      "text": "Custom-made furniture, mattresses that have been unsealed, gift cards, and clearance items marked final sale cannot be returned."
+    },
+    {
+      "passage_id": "KB-RET-03",
+      "title": "Return shipping fees",
+      "text": "Return shipping is free for orders over $75. For orders of $75 or less, a $9.95 return shipping fee is deducted from the refund."
+    },
+    {
+      "passage_id": "KB-RET-04",
+      "title": "Refund timing",
+      "text": "Refunds are issued within 5 business days after the returned item arrives at our warehouse. Banks may take an additional 3 to 7 business days to post the refund."
+    },
+    {
+      "passage_id": "KB-DMG-01",
+      "title": "Damaged items",
+      "text": "If an item arrives damaged, upload a photo on the Orders page within 14 days of delivery. We will ship a free replacement or issue a full refund, and you do not need to return the damaged item."
+    },
+    {
+      "passage_id": "KB-DMG-02",
+      "title": "Damaged large furniture",
+      "text": "For damaged furniture items over 50 pounds, a carrier inspection may be scheduled within 3 business days before a replacement ships."
+    },
+    {
+      "passage_id": "KB-WAR-01",
+      "title": "Furniture warranty",
+      "text": "Furniture has a 2-year limited warranty covering manufacturing defects such as broken joints or faulty hardware. It does not cover normal wear, misuse, pet damage, or accidental damage."
+    },
+    {
+      "passage_id": "KB-WAR-02",
+      "title": "Lighting warranty",
+      "text": "Lamps and light fixtures have a 1-year warranty. LED bulbs sold separately are covered for 90 days."
+    },
+    {
+      "passage_id": "KB-WAR-03",
+      "title": "Warranty claims",
+      "text": "To file a warranty claim, contact support with your order number and photos of the defect. Approved claims receive a repair kit, a replacement part, or a replacement item."
+    },
+    {
+      "passage_id": "KB-SHP-01",
+      "title": "Domestic shipping",
+      "text": "Standard shipping within the contiguous United States takes 3 to 7 business days and is free on orders over $49."
+    },
+    {
+      "passage_id": "KB-SHP-02",
+      "title": "International shipping",
+      "text": "We ship to Canada only; we do not ship to other countries. Canadian orders usually arrive in 7 to 12 business days. Duties and taxes are collected at checkout."
+    },
+    {
+      "passage_id": "KB-SHP-03",
+      "title": "White-glove delivery",
+      "text": "White-glove delivery, which includes in-room placement and packaging removal, is available for furniture for a $129 fee."
+    },
+    {
+      "passage_id": "KB-ORD-01",
+      "title": "Order changes and cancellation",
+      "text": "Orders can be changed or cancelled within 1 hour of purchase from the Orders page. After that, contact support; changes are not guaranteed once an order ships."
+    },
+    {
+      "passage_id": "KB-ORD-02",
+      "title": "Address changes",
+      "text": "The delivery address can be updated until the order ships. Once an order has shipped, address changes must be requested through the carrier."
+    },
+    {
+      "passage_id": "KB-PAY-01",
+      "title": "Payment security",
+      "text": "Kestrel never takes card numbers over chat, email, or phone. Payments are accepted only through secure checkout on the website."
+    },
+    {
+      "passage_id": "KB-PAY-02",
+      "title": "Price adjustments",
+      "text": "If an item's price drops within 7 days of purchase, customers can request a one-time price adjustment for the difference."
+    },
+    {
+      "passage_id": "KB-SUP-01",
+      "title": "Support hours",
+      "text": "Phone support is open Monday to Friday, 8 am to 6 pm Pacific time. Chat support is available every day from 7 am to 10 pm Pacific time."
+    },
+    {
+      "passage_id": "KB-SUP-02",
+      "title": "Compensation requests",
+      "text": "Support agents and the assistant cannot promise credits, discounts, or compensation. Requests for compensation are escalated to a support specialist, who replies within 2 business days."
+    },
+    {
+      "passage_id": "KB-SAF-01",
+      "title": "Candle safety",
+      "text": "Never leave a burning candle unattended or burning overnight. Trim the wick to 6 mm before each use and burn candles for no more than 4 hours at a time."
+    },
+    {
+      "passage_id": "KB-MEM-01",
+      "title": "Kestrel Rewards",
+      "text": "Kestrel Rewards members earn 1 point per dollar spent. 500 points can be redeemed for a $10 reward. Points expire after 12 months without account activity."
+    }
+  ],
+  "test_cases": [
+    {
+      "key": "q-p-phone-number",
+      "input": "What is your customer service phone number?",
+      "relevant_passage_ids": [],
+      "required_terms": [],
+      "expect_abstain": true,
+      "tags": [
+        "rag",
+        "unanswerable",
+        "prospective"
+      ]
+    },
+    {
+      "key": "q-p-mobile-app",
+      "input": "Do you have a mobile app for placing orders?",
+      "relevant_passage_ids": [],
+      "required_terms": [],
+      "expect_abstain": true,
+      "tags": [
+        "rag",
+        "unanswerable",
+        "prospective"
+      ]
+    },
+    {
+      "key": "q-p-fabric-swatches",
+      "input": "Can I order fabric swatches before buying a sofa?",
+      "relevant_passage_ids": [],
+      "required_terms": [],
+      "expect_abstain": true,
+      "tags": [
+        "rag",
+        "unanswerable",
+        "prospective"
+      ]
+    },
+    {
+      "key": "q-p-warehouse-pickup",
+      "input": "Can I pick up my order from your warehouse instead of having it shipped?",
+      "relevant_passage_ids": [],
+      "required_terms": [],
+      "expect_abstain": true,
+      "tags": [
+        "rag",
+        "unanswerable",
+        "prospective"
+      ]
+    }
+  ]
+}
