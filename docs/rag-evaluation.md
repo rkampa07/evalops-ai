@@ -33,7 +33,7 @@ flowchart LR
 time in their own process and post results to the API. The server stays deterministic and its
 memory stays small.
 
-## Deterministic RAG checks (methodology 1.2.0)
+## Deterministic RAG checks (methodology 1.3.0 in the working tree)
 
 Per RAG test case (`relevant_passage_ids` and/or `expect_abstain`), scored against the response's
 `retrieved_passage_ids` and the knowledge base stored in EvalOps (passage text sent by the client is
@@ -46,11 +46,19 @@ never trusted):
 | Claims | answer split into sentences/bullets; questions, courtesy filler, abstention sentences and fragments under 2 content words dropped | |
 | Lexical groundedness | a claim is *supported* if some retrieved passage covers ≥ 60% of its content words (stemmed, stopwords removed) **and** contains every number in the claim (`$9.95`, `30`, "thirty" → `30`) | supported claims / claims < `min_groundedness` (run config, default 0.8) |
 | Abstention | the answer contains a refusal phrase ("I don't have that information…") | the assistant answers an unanswerable question, or declines an answerable one |
+| Content (1.3.0) | a non-abstaining answer must contain an extracted checkable statement | the answer is empty, citation-only, or otherwise yields no checkable statement |
 
 Run aggregates: `retrieval_recall_at_k`, `mrr`, `citation_validity_rate` (micro), `citation_support_rate`,
-`groundedness` (micro over claims), `unsupported_claim_count`, `abstention_accuracy`. The first four plus
-abstention accuracy take part in regression detection; a changed knowledge base makes runs **not
-comparable** (passages are fingerprinted per run).
+`groundedness` (micro over claims), `unsupported_claim_count`, `abstention_accuracy`. Regression detection
+tracks retrieval recall, citation validity, groundedness, and abstention accuracy; MRR and citation
+support are displayed separately. A changed knowledge base makes runs **not comparable**
+(passages are fingerprinted per run).
+
+Methodology 1.2.0 introduced the RAG checks. The pending 1.3.0 patch closes a loophole: a
+citation-only answer could pass because no claims were extracted and no groundedness check failed.
+It now fails `content`; recognized abstentions are exempt from this content check and still undergo
+abstention checking. For `q-opened-mattress`, this lowers v3 from 10/20 under 1.2.0 to **9/20 under
+1.3.0**. V1/v2 scores remain unchanged. No scoring thresholds or release gates were adjusted.
 
 **Default RAG release policy**, applied by the report endpoint to runs that contain RAG cases. It was
 fixed **before any model output was generated**: retrieval recall ≥ 0.8, citation validity = 1.0,
@@ -65,11 +73,12 @@ but it's the wrong answer for an order placed 3 hours ago. Its measured error ra
 `PUT /evaluations/runs/{id}/model-grades` attaches claim-level verdicts from a judge model. Each
 result must grade exactly the claims EvalOps extracted, in order. Verdicts are stored in separate
 fields (`results[].model_grades`, `run.model_graded`) labelled `"estimated"`, together with the judge
-model id, Hugging Face revision, prompt version and prompt hash. They **never** change pass/fail,
+model id, Hugging Face revision, prompt version and prompt hash. They **never** change deterministic case pass/fail,
 the deterministic summary, or `has_regression`. Comparisons show estimated deltas in their own
 section, and only when both runs were graded by the same judge model, revision and prompt. The
 optional gate `min_estimated_groundedness` fails closed when no grades are attached and is not part
-of the default policy.
+of the default policy. An explicitly selected custom policy can gate the estimate; attaching
+grades alone never changes deterministic case results or the default release decision.
 
 ## Labelled claim set and judge calibration
 
@@ -90,6 +99,10 @@ kept, such as "I'm sorry to hear…"; excluded from the metrics below and report
 > which items are reviewed. Treat the numbers as provisional until review is complete and
 > calibration is re-run with `--reviewed-only`. Calibration reports record `label_status_counts`
 > and `labels_are_reviewed`, so a reviewed result can't be confused with this one.
+
+In the audited working tree, **5 of the 96 items are marked reviewed and 91 remain drafts**.
+That status does not retroactively validate the saved calibration reports, which were measured
+against drafts. Human review and calibration on reviewed labels remain incomplete.
 
 ### Reviewing the labels in Excel or Google Sheets
 
@@ -147,7 +160,9 @@ fields.
 **Protocol.** Positive class = *unsupported* (catching fabrication is the goal). `judge-v1` was the
 first prompt. `judge-v2` was written after `judge-v1` failed, using **only the 40 constructed items**
 for development, with few-shot examples from an unrelated domain. The **56 generated items are the
-held-out set.** One revision was made, and iteration stopped to avoid overfitting a small set.
+held-out set for judge-prompt development.** This is not a held-out question set validating
+`rag-v3`, and does not include v3-specific claims. One revision was made, and iteration stopped
+to avoid overfitting a small set.
 
 ### Results (n = 91 labelled claims, `not_a_claim` excluded; 95% Wilson intervals)
 
@@ -180,22 +195,31 @@ unsupported.
 - So the two signals are complementary. Neither is ground truth, which is why they're reported
   side by side and only the deterministic one feeds the default gates.
 
-## End-to-end result: baseline vs candidate prompt
+## End-to-end results: all prompts rescored under methodology 1.3.0
 
-Both prompts used the same model, retriever (BM25, k = 3), decoding (greedy, max 256 tokens) and
+These are audited working-tree results. The v3 implementation, recordings, and methodology
+1.3.0 patch remain uncommitted; this documentation update does not include them. All three
+recordings were rescored with the same engine version, dataset, knowledge base, retrieved passage
+IDs, and scoring configuration. Their model revision and decoding settings also match. Stored
+v1/v2 runs in the developer database still say 1.2.0; they were not rewritten for this audit.
+
+### V1 versus the friendlier v2 candidate
+
+All three prompts used the same model, retriever (BM25, k = 3), decoding (greedy, max 256 tokens) and
 questions. `rag-v2` is a realistic product change: "friendlier, always try to help". It drops "answer
 ONLY from the passages" and the explicit refusal sentence.
 
-| Metric (deterministic) | rag-v1 (baseline) | rag-v2 (candidate) |
-|---|---|---|
-| Cases passed | 9 / 20 | 3 / 20 |
-| Retrieval recall@3 / MRR | 0.853 / 0.814 | 0.853 / 0.814 (same retriever) |
-| Citation validity | 0.90 | 0.92 |
-| Groundedness (lexical) | 0.78 | 0.52 |
-| Unsupported claims | 4 | 22 |
-| Abstention accuracy | 0.90 | 0.85 |
-| Latency p95 | 965 ms | 1709 ms |
-| *Estimated groundedness (Llama judge, separate)* | *0.44* | *0.30* |
+| Metric | rag-v1 (baseline) | rag-v2 | rag-v3 |
+|---|---|---|---|
+| Cases passed | 9 / 20 | 3 / 20 | **9 / 20** |
+| Retrieval recall@3 / MRR | 0.852941 / 0.813725 | 0.852941 / 0.813725 | 0.852941 / 0.813725 |
+| Citation validity | 0.900000 | 0.916667 | **1.000000** |
+| Citation support | 1.000000 | 1.000000 | 0.833333 |
+| Groundedness (lexical) | 0.777778 | 0.521739 | **0.800000** |
+| Unsupported claims | 4 | 22 | 6 |
+| Abstention accuracy | 0.90 | 0.85 | 0.85 |
+| Recorded latency p95 | 964.78 ms | 1709.14 ms | 1219.11 ms |
+| *Estimated groundedness (Llama judge, separate)* | *0.444444* | *0.304348* | *0.533333* |
 
 EvalOps reports **regression detected**: 7 cases went from pass to fail, and pass rate,
 groundedness, abstention accuracy and p95 latency all regressed. The estimated groundedness delta
@@ -215,14 +239,65 @@ declines 2 answerable questions, and retrieval misses the gold passage for 3 que
 mattress" vs the passage's "unsealed"). That's a real finding about a 1.5B model with lexical
 retrieval, not something to tune away.
 
-Reproduce without any model (replays the recorded answers and verdicts):
+### V3: better citation validity, still not ready
+
+V3 was designed after inspecting v1's failures on the same 20 questions, asking for passage
+wording, exact amounts/conditions, citations after every sentence, and abstention when no passage
+addresses the question. There is **no held-out question-set validation** of this prompt.
+
+Against v1, v3 fixes `q-late-credit`, `q-ship-uk`, and `q-white-glove`, but regresses
+`q-showroom-hours`, `q-gift-wrap`, and `q-financing`. Pass rate stays at 45%; abstention accuracy
+falls from 90% to 85%. P95 latency rises 26.4%, exceeding the existing 20% comparison tolerance.
+Against v2, v3 fixes seven cases but regresses `q-return-window`; it is not an improvement on
+every case.
+
+V3 answers all three unanswerable questions. Its **85% abstention accuracy is 17/20 across all
+questions**, including correct answers to answerable questions; it declined **0/3** of the
+unanswerable questions. It invents showroom hours and asserts gift-wrap/financing policies that
+the knowledge base does not cover.
+
+**100% citation validity measures the citations present, not coverage or factual correctness.**
+Four v3 answers have no citations: `q-warranty-claim`, `q-ship-canada`, `q-cancel-order`, and
+`q-rewards-points`. Citation support is only 83.3%, six extracted claims are lexically unsupported,
+and the mattress answer is citation-only. These remain failures despite the aggregate validity
+and groundedness gates passing.
+
+With v1 as baseline and the unchanged default policy, **five gates pass, three fail, and one is
+skipped**:
+
+| Gate | Threshold | V3 actual | Status |
+|---|---|---|---|
+| `min_pass_rate` | ≥ 0.90 | 0.45 | **fail** |
+| `max_forbidden_violations` | ≤ 0 | 0 | pass |
+| `min_schema_pass_rate` | ≥ 1.0 | n/a | skipped |
+| `max_pass_rate_drop` | ≤ 0 | 0 | pass |
+| `max_regressed_cases` | ≤ 0 | 3 | **fail** |
+| `min_retrieval_recall` | ≥ 0.8 | 0.852941 | pass |
+| `min_citation_validity` | ≥ 1.0 | 1.0 | pass |
+| `min_groundedness` | ≥ 0.8 | 0.8 | pass |
+| `min_abstention_accuracy` | ≥ 1.0 | 0.85 | **fail** |
+
+The release verdict is **NOT READY FOR RELEASE**. Latency contributes to the comparison's
+regression verdict but is not a separate default release gate. The judge's higher estimate does
+not override the deterministic failures or these gates.
+
+### Replay without a model
+
+With the pending v3 implementation and recordings available, run:
 
 ```bash
+make setup                   # hash-verified Python install and npm ci
 make backend                 # terminal 1
-make rag-demo                # terminal 2
+make frontend                # terminal 2, for the UI
+make rag-demo                # terminal 3; default judge mode is replay
 ```
 
-`tests/regression/test_rag_golden.py` pins these numbers.
+Replay imports recorded answers and saved verdicts into the local database; it does not regenerate
+or rewrite the example files. Existing runs are reused by the demo script, so stored methodology
+versions are retained. Do not reset the database or relabel old runs to make a comparison appear
+same-version. The pending `tests/regression/test_rag_golden.py` fixtures rescore all three recordings
+with the current engine in isolated test databases and pin the results above. The committed Task 2
+baseline includes v1/v2 recordings only. See the [three-minute demo](demo-3-minute.md).
 
 ## Benchmarks on this Mac (measured)
 
@@ -261,7 +336,9 @@ mlx-lm 0.32.0, Python 3.13.2. Other apps (browser, editor) were open, as on a no
 | Peak memory footprint | 2.52 GB | 2.54 GB |
 | Wall time | 68 s | 99 s |
 
-Grading the two demo runs live took 18.8 s (18 claims) and 47.2 s (46 claims) after a ~1.9 s load.
+Saved live-grading benchmarks report 18.84 s for v1 (18 claims), 47.22 s for v2 (46 claims),
+and 39.15 s for v3 (30 claims), after roughly 1.8–2.1 s model loads. These are historical
+measurements, not new inference runs performed for this documentation update.
 
 Notes:
 - Process RSS undercounts MLX (it excluded most GPU allocations: 0.70 GB RSS vs 1.48 GB footprint).
@@ -278,12 +355,18 @@ library versions, machine, prompt version and SHA-256 of the prompt template, de
 throughput, finish reason and peak memory. The knowledge base is fingerprinted per run, and judge
 grades carry the judge model, revision, prompt version and hash. Greedy decoding is deterministic for
 a fixed model, prompt and MLX version on the same machine. It has not been verified across machines
-or library versions, which is why the recorded outputs are committed and replayed in tests.
+or library versions. V1/v2 outputs are committed and replayed in tests; the pending v3 recording
+is present only in the working tree until its implementation/data changes are reviewed separately.
 
 ## Limitations
 
-- **Labels are drafts by the developer, not independent human labels** (see above). The
-  calibration numbers are provisional.
+- **Label review is incomplete:** 5 reviewed, 91 draft items; saved calibration used developer
+  drafts and is provisional, not independent validation.
+- **No held-out question validation for v3:** it was developed on the same 20 evaluated questions.
+- **Weak abstention and missing citations:** v3 declines none of the 3 unanswerable questions and
+  omits citations in four answers. Passing aggregate citation validity does not resolve these.
+- **Imperfect judge calibration:** held-out claim precision 0.42 and κ 0.34 do not justify using
+  the 3B judge as a default release gate. Its v3 estimate is not a new calibration result.
 - **Small samples:** 20 questions, 91 labelled claims. Confidence intervals are wide; one prompt
   comparison on one model is a demonstration, not a benchmark.
 - **One generator model (1.5B) and one judge model (3B).** Larger local models need more than 8 GB

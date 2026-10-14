@@ -18,7 +18,7 @@ It does **not**:
 - judge tone, helpfulness, or reasoning quality,
 - understand paraphrase. "Returns are accepted within a month" and "You have 30 days to return" share few tokens.
 
-High token F1 means *the words overlap with the reference*. It does not mean *the answer is right*. The release report says so on every page. Treat these metrics as **regression detectors and guardrails**, and review failing and borderline cases by hand. Semantic and model-graded metrics are on the [roadmap](roadmap.md) and would be labelled as such.
+High token F1 means *the words overlap with the reference*. It does not mean *the answer is right*. The release report says so on every page. Treat these metrics as **regression detectors and guardrails**, and review failing and borderline cases by hand. The existing local model-judge scores are separately labelled estimates; broader semantic checks remain on the [roadmap](roadmap.md).
 
 ## Text normalization
 
@@ -88,12 +88,25 @@ Latency is **reported by the client** (`latency_ms` per response); EvalOps does 
 
 Cases with no submitted response are scored as failures (`missing_response`) and count in the pass-rate denominator. Responses referencing unknown case keys are rejected with 422 so typos can't silently drop cases.
 
-### RAG checks (methodology 1.2.0)
+### RAG checks (methodology 1.3.0 in the working tree)
 
 Cases with `relevant_passage_ids` or `expect_abstain` also get retrieval, citation, lexical
 groundedness and abstention checks against the dataset's knowledge-base passages. Model-judge
 verdicts are a separate, estimated category. Full definitions, measured error rates and limitations
 are in [rag-evaluation.md](rag-evaluation.md).
+
+Methodology 1.2.0 introduced these RAG checks. The pending 1.3.0 change adds a `content`
+failure when a non-abstaining answer contains no extracted checkable statement, including empty
+or citation-only output. A recognized abstention is exempt from this content check but still
+undergoes the abstention check. This closes a case-pass loophole; it does not change citation,
+groundedness, or release-gate thresholds.
+
+Rescoring all three recorded prompts with the same 1.3.0 engine yields v1 **9/20**, v2 **3/20**,
+and v3 **9/20**. Under 1.2.0, v3 was **10/20** because `q-opened-mattress` contains only
+citation markers; v1/v2 scores are unchanged. These figures describe the audited working tree,
+not implementation changes included in this documentation update. Existing stored runs keep
+their recorded methodology version; comparisons across minor versions show a warning. Use
+same-version rescoring for a like-for-like assessment rather than relabelling stored scores.
 
 ## Run-level aggregates
 
@@ -154,7 +167,8 @@ gates (`min_pass_rate`, etc.) still use its full summary.
 - **Methodology** (`engine/versioning.py`, semver): MAJOR = scores may change for the same
   inputs (not comparable); MINOR = additive/robustness changes that leave well-formed inputs'
   scores unchanged; PATCH = no scoring impact. 1.0.0 → 1.1.0 added time-limited regex
-  evaluation (below).
+  evaluation; 1.2.0 added RAG evidence checks; the pending 1.3.0 change rejects
+  empty/citation-only non-abstaining RAG answers as described above.
 - **Pre-existing data** (migration `0002`): runs are marked methodology `1.0.0`. A legacy
   result gets a definition hash only if its test case still exists and was not modified after
   the run; otherwise its definition is recorded as unknown rather than guessed.
@@ -195,6 +209,12 @@ Rules:
 - Decision = `pass` only if no gate failed. At least one gate must be configured.
 
 **Default release policy** (used by the report endpoint): `min_pass_rate 0.9`, `max_forbidden_violations 0`, `min_schema_pass_rate 1.0`, plus `max_pass_rate_drop 0` and `max_regressed_cases 0` when a baseline is supplied. When no baseline is given, the report says regression detection was not performed.
+
+For RAG runs, the report also requires retrieval recall ≥ 0.8, citation validity ≥ 1.0, lexical
+groundedness ≥ 0.8, and abstention accuracy ≥ 1.0. V3 versus v1 under methodology 1.3.0 fails
+`min_pass_rate` (0.45 < 0.9), `min_abstention_accuracy` (0.85 < 1.0), and
+`max_regressed_cases` (3 > 0): five gates pass, three fail, and the inapplicable schema gate is
+skipped. P95 latency regresses in the comparison, but is not a separate default release gate.
 
 ## Reproducibility
 
