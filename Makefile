@@ -4,7 +4,7 @@ PIP     := backend/.venv/bin/pip
 API_URL ?= http://127.0.0.1:8000
 
 .PHONY: setup setup-local-ai backend frontend seed migrate test test-backend test-frontend lint check clean-db \
-	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import lock
+	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import lock e2e e2e-install
 
 GEN_MODEL   ?= mlx-community/Qwen2.5-1.5B-Instruct-4bit
 JUDGE_MODEL ?= mlx-community/Llama-3.2-3B-Instruct-4bit
@@ -85,3 +85,9 @@ lock:             ## Regenerate hash-pinned lockfiles using Python 3.13
 		--output-file requirements/dev.lock pyproject.toml
 	backend/.venv/bin/pip-compile -q --generate-hashes --strip-extras --extra dev --extra local-ai \
 		--output-file requirements/local-ai.lock pyproject.toml
+
+e2e:              ## Playwright browser tests against a real API + UI on ports 8001/5174 (temp database)
+	cd frontend && npm run test:e2e
+
+e2e-install:      ## Install the Chromium version used by Playwright
+	cd frontend && npm run test:e2e:install

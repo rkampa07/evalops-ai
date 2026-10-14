@@ -4,7 +4,10 @@ GitHub Actions runs on pull requests, pushes to `main`, and manual dispatch.
 Independent Ubuntu jobs check the backend (Ruff lint/format and all pytest suites)
 and frontend (TypeScript, ESLint, Vitest, and production build). Failed checks fail
 the workflow. Repository branch protection can require these jobs before merging.
-This task does not publish or deploy artifacts, or change evaluation release gates.
+The workflow does not publish or deploy artifacts, or change evaluation release gates.
+
+A third job runs Playwright against an isolated API and UI in Chromium, with browser
+caching and report uploads. See [Browser end-to-end tests](e2e.md) for setup and coverage.
 
 CI uses Python 3.13 and Node 22. Backend tests use deterministic scoring and recorded
 fixtures; no MLX install, model downloads, API keys, or paid services are required.

@@ -63,3 +63,52 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+
+  e2e:
+    name: End-to-end (Chromium, real API and UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked backend dependencies
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install --require-hashes -r requirements/tooling.lock
+          backend/.venv/bin/pip install --require-hashes -r requirements/dev.lock
+          backend/.venv/bin/pip install --no-deps --no-build-isolation -e .
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install Chromium and system dependencies
+        working-directory: frontend
+        # Always install OS dependencies, including on a browser-cache hit.
+        run: npx playwright install --with-deps chromium
+      - name: Type check browser tests
+        working-directory: frontend
+        run: npm run typecheck:e2e
+      - name: Run Playwright (starts isolated API and UI)
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Upload browser report and failure traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7

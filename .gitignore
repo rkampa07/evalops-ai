@@ -27,3 +27,7 @@ frontend/coverage/
 
 # Personal label-review working files (hints from external tools)
 examples/rag/labels/*_priority.csv
+
+# Playwright outputs
+frontend/test-results/
+frontend/playwright-report/
