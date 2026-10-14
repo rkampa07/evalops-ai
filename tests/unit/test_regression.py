@@ -132,3 +132,13 @@ def test_warning_issue_keeps_runs_comparable():
     issue = {"severity": "warning", "kind": "methodology_version", "message": "minor"}
     r = compare_runs(summary(), summary(), {"a": snap(True)}, {"a": snap(False)}, issues=[issue])
     assert r["compatible"] is True and r["has_regression"] is True
+
+
+def test_regression_messages_round_numbers_but_metric_values_keep_full_precision():
+    baseline = summary(pass_rate=0.9166666666666666, latency_p95_ms=964.7800000000002)
+    candidate = summary(pass_rate=0.6666666666666666, latency_p95_ms=1709.1350000000011)
+    r = compare_runs(baseline, candidate, {}, {})
+    assert "pass_rate regressed: 0.9167 -> 0.6667" in r["regression_reasons"]
+    assert "latency_p95_ms regressed: 964.78 -> 1709.13" in r["regression_reasons"]
+    raw = deltas(r)["latency_p95_ms"]  # display-only change: data is not rounded
+    assert raw["baseline"] == 964.7800000000002 and raw["candidate"] == 1709.1350000000011

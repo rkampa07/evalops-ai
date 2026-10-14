@@ -47,6 +47,11 @@ class CaseSnapshot:
     failures: list[dict[str, str]]
 
 
+def _fmt(value: float | None) -> str:
+    """Human-readable number for messages (e.g. 964.7800000000002 -> 964.78)."""
+    return "n/a" if value is None else f"{round(value, 4):g}"
+
+
 def _metric_status(
     baseline: float | None,
     candidate: float | None,
@@ -180,7 +185,9 @@ def compare_runs(
         reasons.append(f"{counts['regressed']} case(s) went from pass to fail")
     for d in metric_deltas:
         if d["status"] == "regressed":
-            reasons.append(f"{d['metric']} regressed: {d['baseline']} -> {d['candidate']}")
+            reasons.append(
+                f"{d['metric']} regressed: {_fmt(d['baseline'])} -> {_fmt(d['candidate'])}"
+            )
 
     return {
         "compatible": True,

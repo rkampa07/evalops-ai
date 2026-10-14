@@ -72,7 +72,12 @@ export function DatasetDetail() {
         <Card
           title={`Knowledge base (${passages.length} passages)`}
           actions={
-            <button className="btn btn-small" onClick={() => setShowPassages(!showPassages)} aria-expanded={showPassages}>
+            <button
+              className="btn btn-small"
+              onClick={() => setShowPassages(!showPassages)}
+              aria-expanded={showPassages}
+              aria-label={`${showPassages ? "Hide" : "Show"} knowledge base passages`}
+            >
               {showPassages ? "Hide" : "Show"}
             </button>
           }
