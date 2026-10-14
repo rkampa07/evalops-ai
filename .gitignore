@@ -34,3 +34,6 @@ frontend/playwright-report/
 
 # Live RAG generation/judging outputs (committed evidence lives elsewhere and is never overwritten)
 examples/rag/live/
+
+# Local orchestration tooling (not part of EvalOps AI)
+/orchestrator/
