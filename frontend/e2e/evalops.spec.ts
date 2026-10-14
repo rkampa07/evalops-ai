@@ -83,3 +83,22 @@ test("RAG release report applies the predefined RAG gates", async ({ page }) => 
   }
   await expect(page.getByText(/Model-based metrics are ESTIMATES/)).toBeVisible();
 });
+
+test("rag-v3 improves citations but is still not release-ready", async ({ page }) => {
+  await page.goto("/reports");
+  await pick(page, "Candidate run", "rag-v3");
+  await pick(page, /Baseline run/, "rag-v1");
+  await expect(page.getByTestId("verdict")).toHaveText("NOT READY FOR RELEASE");
+  await expect(page.getByRole("row", { name: /min_citation_validity/ })).toContainText("pass");
+  for (const gate of ["min_pass_rate", "min_abstention_accuracy", "max_regressed_cases"]) {
+    await expect(page.getByRole("row", { name: new RegExp(gate) })).toContainText("fail");
+  }
+  await page.goto("/compare");
+  await pick(page, "Baseline run", "rag-v1");
+  const response = page.waitForResponse((r) => r.url().includes("/evaluations/compare") && r.status() === 200);
+  await pick(page, "Candidate run", "rag-v3");
+  const comparison = await (await response).json();
+  expect(comparison.compatible).toBe(true);
+  expect(comparison.case_counts.regressed).toBe(3);
+  await expect(page.getByTestId("compare-verdict")).toHaveText("Regression detected");
+});

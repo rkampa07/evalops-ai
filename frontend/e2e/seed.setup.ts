@@ -1,6 +1,7 @@
 import { expect, test as setup, type APIRequestContext } from "@playwright/test";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { API_URL } from "./environment";
 
 const examples = path.resolve(import.meta.dirname, "../../examples");
@@ -32,31 +33,26 @@ setup("fresh database empty states and recorded demo seed", async ({ page, reque
     await post(request, "/evaluations/runs", { ...read(`responses/${file}.json`), dataset_id: ds.id });
   }
 
-  const rag = read("rag/kestrel_policy_kb.json");
-  const kb = await post(request, "/datasets", { name: rag.name, description: rag.description });
-  await post(request, `/datasets/${kb.id}/passages`, { passages: rag.passages });
-  await post(request, `/datasets/${kb.id}/test-cases/bulk`, { test_cases: rag.test_cases });
-  // Replay committed recordings only. Additional local recordings are supported
-  // without invoking a generator or modifying fixtures or human-review labels.
-  const files = readdirSync(path.join(examples, "rag/responses"))
-    .filter((file) => /^qwen2\.5-1\.5b_rag-v\d+\.json$/.test(file)).sort();
-  expect(files).toEqual(expect.arrayContaining(["qwen2.5-1.5b_rag-v1.json", "qwen2.5-1.5b_rag-v2.json"]));
-  for (const file of files) {
-    const record = read(`rag/responses/${file}`);
-    const run = await post(request, "/evaluations/runs", {
-      dataset_id: kb.id,
-      model_name: record.model_name,
-      prompt_version: record.prompt_version,
-      label: record.label,
-      config: record.config,
-      generation: record.generation,
-      responses: record.responses,
-    });
-    const grades = read(`rag/grades/llama3.2-3b_judge-v2_on_qwen-${record.prompt_version}.json`);
-    const response = await request.put(`${API_URL}/evaluations/runs/${run.id}/model-grades`, {
-      data: { judge: grades.judge, grades: grades.grades },
-    });
-    expect(response.ok(), await response.text()).toBe(true);
+  // Exercise the actual demo twice in the isolated test database: replay only,
+  // with idempotent seeding and no discovery of unrelated experimental recordings.
+  const root = path.resolve(examples, "..");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const output = execFileSync(path.join(root, "backend/.venv/bin/python"), [
+      path.join(root, "backend/scripts/rag_demo.py"), "--base-url", API_URL, "--judge", "replay",
+    ], { encoding: "utf8" });
+    expect(output).toContain("methodology 2.0.0");
+    expect(output).toContain("Comparison rag-v1 -> rag-v3: compatible=True");
+    expect(output).toMatch(/\(rag-v3\): NOT_READY - 5 passed, 3 failed, 1 skipped/);
+  }
+  const runs = await (await request.get(`${API_URL}/evaluations/runs?limit=200`)).json();
+  const ragRuns = runs.items.filter((run: { prompt_version: string }) => run.prompt_version.startsWith("rag-"));
+  expect(ragRuns.map((run: { prompt_version: string }) => run.prompt_version).sort()).toEqual(["rag-v1", "rag-v2", "rag-v3"]);
+  for (const run of ragRuns) {
+    expect(run.methodology_version).toBe("2.0.0");
+    if (["rag-v1", "rag-v3"].includes(run.prompt_version)) {
+      expect(run.summary.passed_cases).toBe(9);
+      expect(run.summary.total_cases).toBe(20);
+    }
   }
   const datasets = await (await request.get(`${API_URL}/datasets`)).json();
   expect(datasets.map((d: { name: string }) => d.name).sort()).toEqual(["kestrel-policy-rag-v1", "kestrel-support-v1"]);

@@ -20,13 +20,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _api import call  # noqa: E402
 
+from evalops.engine.versioning import METHODOLOGY_VERSION  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 RAG = ROOT / "examples/rag"
 BASELINE = RAG / "responses/qwen2.5-1.5b_rag-v1.json"
 CANDIDATE = RAG / "responses/qwen2.5-1.5b_rag-v2.json"
+CANDIDATE_V3 = RAG / "responses/qwen2.5-1.5b_rag-v3.json"
 GRADES = {
     BASELINE: RAG / "grades/llama3.2-3b_judge-v2_on_qwen-rag-v1.json",
     CANDIDATE: RAG / "grades/llama3.2-3b_judge-v2_on_qwen-rag-v2.json",
+    CANDIDATE_V3: RAG / "grades/llama3.2-3b_judge-v2_on_qwen-rag-v3.json",
 }
 JUDGE_MODEL = "mlx-community/Llama-3.2-3B-Instruct-4bit"
 
@@ -63,9 +67,13 @@ def ensure_run(base: str, ds_id: int, path: Path) -> dict:
         )
         if (
             same
+            and run["methodology_version"] == METHODOLOGY_VERSION
             and (run["generation"] or {}).get("prompt_hash") == record["generation"]["prompt_hash"]
         ):
-            print(f"run for {path.name} exists (id={run['id']})")
+            print(
+                f"run for {path.name} exists (id={run['id']}, "
+                f"methodology {run['methodology_version']})"
+            )
             return run
     body = {k: record[k] for k in ("model_name", "prompt_version", "label", "config", "generation")}
     body |= {"dataset_id": ds_id, "responses": record["responses"]}
@@ -119,26 +127,38 @@ def main() -> None:
     args = parser.parse_args()
     base = args.base_url
 
+    print(f"Replaying historical recordings under methodology {METHODOLOGY_VERSION}")
     ds = ensure_dataset(base)
     baseline = ensure_run(base, ds["id"], BASELINE)
     candidate = ensure_run(base, ds["id"], CANDIDATE)
-    for run, path in ((baseline, BASELINE), (candidate, CANDIDATE)):
+    candidate_v3 = ensure_run(base, ds["id"], CANDIDATE_V3)
+    pairs = ((baseline, BASELINE), (candidate, CANDIDATE), (candidate_v3, CANDIDATE_V3))
+    for run, path in pairs:
         attach_grades(base, run, path, args.judge)
 
-    cmp = call(
-        base,
-        "GET",
-        f"/evaluations/compare?baseline_run_id={baseline['id']}&candidate_run_id={candidate['id']}",
-    )
-    print(f"\nComparison: compatible={cmp['compatible']} has_regression={cmp['has_regression']}")
-    for reason in cmp["regression_reasons"]:
-        print(f"  - {reason}")
-    for d in cmp["estimated_metric_deltas"]:
-        print(f"  (estimated) {d['metric']}: {d['baseline']} -> {d['candidate']} [{d['status']}]")
-    if cmp["estimated_note"]:
-        print(f"  note: {cmp['estimated_note']}")
+    for cand in (candidate, candidate_v3):
+        cmp = call(
+            base,
+            "GET",
+            f"/evaluations/compare?baseline_run_id={baseline['id']}&candidate_run_id={cand['id']}",
+        )
+        print(
+            f"\nComparison rag-v1 -> {cand['prompt_version']}: compatible={cmp['compatible']} "
+            f"has_regression={cmp['has_regression']}"
+        )
+        for reason in cmp["regression_reasons"]:
+            print(f"  - {reason}")
+        for d in cmp["estimated_metric_deltas"]:
+            print(
+                f"  (estimated) {d['metric']}: {d['baseline']} -> {d['candidate']} [{d['status']}]"
+            )
 
-    for label, run, b in (("baseline", baseline, None), ("candidate", candidate, baseline["id"])):
+    reports = (
+        ("baseline", baseline, None),
+        ("candidate", candidate, baseline["id"]),
+        ("candidate", candidate_v3, baseline["id"]),
+    )
+    for label, run, b in reports:
         query = f"?baseline_run_id={b}" if b else ""
         rep = call(base, "GET", f"/evaluations/runs/{run['id']}/report{query}")
         g = rep["gate_evaluation"]
@@ -150,9 +170,11 @@ def main() -> None:
         for gate in g["gates"]:
             if gate["status"] != "skipped":
                 print(f"  {gate['status'].upper():4} {gate['gate']}: {gate['message']}")
-    print(
-        f"\nUI: http://127.0.0.1:5173/compare?baseline={baseline['id']}&candidate={candidate['id']}"
-    )
+    for cand in (candidate, candidate_v3):
+        print(
+            f"\nUI ({cand['prompt_version']}): http://127.0.0.1:5173/compare"
+            f"?baseline={baseline['id']}&candidate={cand['id']}"
+        )
 
 
 if __name__ == "__main__":
