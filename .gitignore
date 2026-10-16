@@ -37,3 +37,12 @@ examples/rag/live/
 
 # Local orchestration tooling (not part of EvalOps AI)
 /orchestrator/
+
+# Local experiments (provisional benchmarks, plans, results); not committed evidence
+/experiments/
+!/experiments/
+/experiments/*
+!/experiments/semantic-eval/
+/experiments/semantic-eval/*
+!/experiments/semantic-eval/citation_evaluator.py
+!/experiments/semantic-eval/test_citation_evaluator.py

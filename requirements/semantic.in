@@ -1,0 +1,6 @@
+# Optional: CPU PyTorch for the experimental semantic evaluator (backend/evalops/semantic).
+# Not used by the API, scoring methodology 2.0.0, chat or release gates. Shared packages are
+# constrained to the versions in local-ai.lock (already installed); only torch and its new
+# dependencies are resolved here.
+-c local-ai.lock
+torch>=2.5
