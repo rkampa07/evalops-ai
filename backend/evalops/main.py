@@ -11,10 +11,12 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from . import __version__
-from .api import datasets, evaluations, health
+from .api import auth, chat, datasets, evaluations, health, workspaces
+from .chat.runtime import ChatRuntime
 from .config import Settings
 from .db import make_engine, make_session_factory, run_migrations
 from .errors import register_error_handlers
+from .llm.retriever_cache import RetrieverCache
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -38,13 +40,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)
+    # Off by default; the model (if any) loads lazily on the first chat message.
+    app.state.chat_runtime = ChatRuntime(settings.chat_backend, settings.chat_model)
+    # Empty and allocation-light at startup; BM25 indexes are built only when a chat turn needs
+    # one, then retained within explicit process-local bounds.
+    app.state.retriever_cache = RetrieverCache()
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=False,
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-Workspace-ID"],
     )
     register_error_handlers(app)
 
@@ -65,8 +72,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # any other processing. A "*" entry is never accepted from configuration.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts or ["localhost"])
     app.include_router(health.router)
+    app.include_router(auth.router)
+    app.include_router(workspaces.router)
     app.include_router(datasets.router)
     app.include_router(evaluations.router)
+    app.include_router(chat.router)
     return app
 
 

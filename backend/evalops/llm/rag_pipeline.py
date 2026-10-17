@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ..engine.rag import BM25Index
@@ -113,17 +114,35 @@ def build_messages(version: str, question: str, passages: list[dict]) -> list[di
 
 @dataclass
 class Retriever:
-    passages: list[dict]
+    passages: Sequence[Mapping[str, str]]
     k: int = 3
 
     def __post_init__(self) -> None:
+        # Retain one detached snapshot. A process-wide cache must not retain ORM objects after a
+        # request session closes.
+        self.passages = tuple(
+            {
+                "passage_id": p.get("passage_id", "") if isinstance(p, Mapping) else p.passage_id,
+                "title": p.get("title", "") if isinstance(p, Mapping) else p.title,
+                "text": p.get("text", "") if isinstance(p, Mapping) else p.text,
+            }
+            for p in self.passages
+        )
         self.by_id = {p["passage_id"]: p for p in self.passages}
+        self.knowledge_base = {p["passage_id"]: p["text"] for p in self.passages}
         self.index = BM25Index(
             {p["passage_id"]: f"{p['title']}. {p['text']}" for p in self.passages}
         )
 
     def retrieve(self, question: str) -> list[dict]:
-        return [self.by_id[pid] for pid in self.index.search(question, self.k)]
+        retrieved, _ = self.retrieve_with_scores(question)
+        return retrieved
+
+    def retrieve_with_scores(self, question: str) -> tuple[list[dict], dict[str, float]]:
+        """Score once and reuse the map for deterministic top-k selection."""
+        scores = self.index.score(question)
+        ids = self.index.rank(scores, self.k)
+        return [self.by_id[pid] for pid in ids], scores
 
     def describe(self) -> dict:
         return {"retriever": "bm25", "k": self.k, "k1": self.index.k1, "b": self.index.b}

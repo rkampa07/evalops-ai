@@ -62,11 +62,20 @@ def test_predictor_inputs_are_allowlisted_and_exclude_gold_and_review_fields(mon
     assert seen[0].retrieved_passages == example["evidence"]
     assert not any(
         secret in repr(seen[0])
-        for secret in ("poison-claim-label", "GOLD-PASSAGE", "poison-review-explanation", "poison-reviewer-note")
+        for secret in (
+            "poison-claim-label",
+            "GOLD-PASSAGE",
+            "poison-review-explanation",
+            "poison-reviewer-note",
+        )
     )
     assert set(rows[0]["predictor_input"]) == {
-        "claim_text", "question_text", "citation_ids", "retrieved_passages",
-        "knowledge_base_ids", "citation_expected",
+        "claim_text",
+        "question_text",
+        "citation_ids",
+        "retrieved_passages",
+        "knowledge_base_ids",
+        "citation_expected",
     }
 
 

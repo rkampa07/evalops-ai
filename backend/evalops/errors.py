@@ -35,22 +35,67 @@ class ConflictError(DomainError):
     code = "conflict"
 
 
+class BusyError(DomainError):
+    status_code = 429
+    code = "busy"
+
+
+class QuotaExceededError(DomainError):
+    status_code = 429
+    code = "quota_exceeded"
+
+    def __init__(self, message: str, retry_after: int = 60):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class ChatDisabledError(DomainError):
+    status_code = 503
+    code = "chat_disabled"
+
+
 class UnprocessableError(DomainError):
     status_code = 422
     code = "unprocessable"
 
 
-def _envelope(status: int, code: str, message: str, details=None) -> JSONResponse:
+class MissingRetrievalMetadataError(DomainError):
+    status_code = 409
+    code = "retrieval_metadata_missing"
+
+
+class StaleKnowledgeBaseError(DomainError):
+    status_code = 409
+    code = "stale_knowledge_base"
+
+
+class InconsistentRetrievalError(DomainError):
+    status_code = 409
+    code = "inconsistent_retrieval_metadata"
+
+
+class ModelUnavailableError(DomainError):
+    status_code = 503
+    code = "model_unavailable"
+
+
+def _envelope(status: int, code: str, message: str, details=None, headers=None) -> JSONResponse:
     body: dict = {"error": {"code": code, "message": message}}
     if details is not None:
         body["error"]["details"] = details
-    return JSONResponse(status_code=status, content=body)
+    return JSONResponse(status_code=status, content=body, headers=headers)
 
 
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def _domain(_: Request, exc: DomainError):
-        return _envelope(exc.status_code, exc.code, exc.message)
+        if isinstance(exc, QuotaExceededError):
+            headers = {"Retry-After": str(exc.retry_after)}
+        elif isinstance(exc, BusyError):
+            headers = {"Retry-After": "5"}
+        else:
+            headers = None
+        return _envelope(exc.status_code, exc.code, exc.message, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError):
@@ -66,7 +111,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, exc: StarletteHTTPException):
-        return _envelope(exc.status_code, "http_error", str(exc.detail))
+        return _envelope(exc.status_code, "http_error", str(exc.detail), headers=exc.headers)
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):

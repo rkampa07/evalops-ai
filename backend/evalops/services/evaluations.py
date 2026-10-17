@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..engine import gates as gate_engine
@@ -24,8 +25,8 @@ from ..engine.versioning import (
     knowledge_base_hash,
     methodology_compatibility,
 )
-from ..errors import NotFoundError, UnprocessableError
-from ..models import EvaluationResult, EvaluationRun
+from ..errors import ConflictError, NotFoundError, UnprocessableError
+from ..models import CitationAssessmentJob, ClaimAssessmentJob, EvaluationResult, EvaluationRun
 from ..repositories.datasets import DatasetRepository, TestCaseRepository
 from ..repositories.runs import RunRepository
 from ..schemas import (
@@ -37,6 +38,7 @@ from ..schemas import (
     GateRequest,
     MetricDelta,
     ModelGradesIn,
+    Page,
     ReportOut,
     ResultOut,
     RunCreate,
@@ -96,8 +98,9 @@ def run_ref(run: EvaluationRun) -> RunRef:
 
 
 class EvaluationService:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, *, workspace_id: int = 1):
         self.s = session
+        self.workspace_id = workspace_id
         self.runs = RunRepository(session)
         self.datasets = DatasetRepository(session)
         self.cases = TestCaseRepository(session)
@@ -105,7 +108,7 @@ class EvaluationService:
     # ------------------------------------------------------------ runs
 
     def create_run(self, data: RunCreate) -> RunDetailOut:
-        dataset = self.datasets.get(data.dataset_id)
+        dataset = self.datasets.get(data.dataset_id, workspace_id=self.workspace_id)
         if dataset is None:
             raise NotFoundError(f"dataset {data.dataset_id} not found")
         cases = self.cases.list_for_dataset(dataset.id)
@@ -145,6 +148,7 @@ class EvaluationService:
         summary = summarize(results)
         run = EvaluationRun(
             dataset_id=dataset.id,
+            workspace_id=self.workspace_id,
             model_name=data.model_name,
             prompt_version=data.prompt_version,
             label=data.label,
@@ -265,7 +269,7 @@ class EvaluationService:
         return self.get_run(run.id)
 
     def _get(self, run_id: int, *, with_results: bool = False) -> EvaluationRun:
-        run = self.runs.get(run_id, with_results=with_results)
+        run = self.runs.get(run_id, with_results=with_results, workspace_id=self.workspace_id)
         if run is None:
             raise NotFoundError(f"evaluation run {run_id} not found")
         return run
@@ -276,7 +280,11 @@ class EvaluationService:
         out.dataset_name = run.dataset.name
         return out
 
+    def get_run_summary(self, run_id: int) -> RunOut:
+        return run_out(self._get(run_id))
+
     def list_runs(self, **filters) -> RunList:
+        filters["workspace_id"] = self.workspace_id
         items, total = self.runs.list(**filters)
         return RunList(
             items=[run_out(r) for r in items],
@@ -285,8 +293,48 @@ class EvaluationService:
             offset=filters.get("offset", 0),
         )
 
+    def list_run_results(
+        self,
+        run_id: int,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        failed_only: bool = False,
+    ) -> Page[ResultOut]:
+        if self.runs.get(run_id, with_dataset=False, workspace_id=self.workspace_id) is None:
+            raise NotFoundError(f"evaluation run {run_id} not found")
+        results, total = self.runs.list_results(
+            run_id, limit=limit, offset=offset, failed_only=failed_only
+        )
+        return Page(
+            items=[ResultOut.model_validate(result) for result in results],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+
     def delete_run(self, run_id: int) -> None:
-        self.runs.delete(self._get(run_id))
+        run = self._get(run_id)
+        has_assessments = self.s.scalar(
+            select(CitationAssessmentJob.id)
+            .where(
+                CitationAssessmentJob.run_id == run.id,
+                CitationAssessmentJob.workspace_id == self.workspace_id,
+            )
+            .limit(1)
+        )
+        if has_assessments is None:
+            has_assessments = self.s.scalar(
+                select(ClaimAssessmentJob.id)
+                .where(
+                    ClaimAssessmentJob.run_id == run.id,
+                    ClaimAssessmentJob.workspace_id == self.workspace_id,
+                )
+                .limit(1)
+            )
+        if has_assessments is not None:
+            raise ConflictError("evaluation run has assessment history and cannot be deleted")
+        self.runs.delete(run)
         self.s.commit()
 
     # ------------------------------------------------------------ comparison

@@ -39,6 +39,15 @@ class OrmOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class Page[PageItem](BaseModel):
+    """Opt-in page envelope; legacy list endpoints remain arrays without query parameters."""
+
+    items: list[PageItem]
+    total: int
+    limit: int
+    offset: int
+
+
 # ---------------------------------------------------------------- datasets
 
 
@@ -349,6 +358,208 @@ class RunList(BaseModel):
     offset: int
 
 
+# ---------------------------------------------------------------- durable evaluation jobs
+
+JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+
+
+class JobErrorOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+
+
+class JobProgressOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    completed: int
+    total: int
+    fraction: float | None
+
+
+class EvaluationJobOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: int
+    status: JobStatus
+    status_url: str
+    dataset_id: int
+    dataset_version: int
+    scoring_input_fingerprint: str
+    knowledge_base_hash: str | None
+    progress: JobProgressOut
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None
+    heartbeat_at: datetime | None
+    finished_at: datetime | None
+    attempt_count: int
+    lease_owner: str | None
+    lease_expires_at: datetime | None
+    cancellation_requested_at: datetime | None
+    error: JobErrorOut | None
+    run_id: int | None
+    retry_of_job_id: int | None
+    replayed: bool = False
+
+
+# ---------------------------------------------------------------- frozen citation assessments
+
+CitationAssessmentStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+CitationPredictionStatus = Literal[
+    "correct",
+    "wrong_passage",
+    "unrelated",
+    "not_retrieved",
+    "partial",
+    "not_applicable",
+    "missing_citation",
+    "invalid_citation",
+    "unresolved",
+]
+
+
+class CitationAssessmentCreate(StrictInput):
+    evaluator: Literal["citation"]
+    citation_expected: bool
+
+
+class ClaimAssessmentCreate(StrictInput):
+    evaluator: Literal["claim"]
+
+
+AssessmentCreate = Annotated[
+    CitationAssessmentCreate | ClaimAssessmentCreate,
+    Field(discriminator="evaluator"),
+]
+
+
+class CitationAssessmentJobOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: int
+    evaluator: Literal["citation"]
+    status: CitationAssessmentStatus
+    status_url: str
+    result_url: str
+    run_id: int
+    result_id: int
+    progress: JobProgressOut
+    evaluator_version: str
+    predictor_sha256: str
+    runner_sha256: str
+    config_digest: str
+    input_fingerprint: str
+    knowledge_base_hash: str | None
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None
+    heartbeat_at: datetime | None
+    finished_at: datetime | None
+    attempt_count: int
+    cancellation_requested: bool
+    error: JobErrorOut | None
+    replayed: bool = False
+
+
+class CitationDecisionOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    citation_id: str | None
+    status: CitationPredictionStatus
+    reason_code: str
+    reason: str
+    component_coverage: list[float]
+
+
+class CitationAssessmentResultOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: int
+    run_id: int
+    result_id: int
+    case_key: str
+    evaluator_version: str
+    predictor_sha256: str
+    runner_sha256: str
+    config_digest: str
+    input_fingerprint: str
+    knowledge_base_hash: str | None
+    status: CitationPredictionStatus
+    reason_code: str
+    reason: str
+    per_citation: list[CitationDecisionOut]
+    created_at: datetime
+
+
+class ClaimAssessmentJobOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: int
+    evaluator: Literal["claim"]
+    status: CitationAssessmentStatus
+    status_url: str
+    result_url: str
+    run_id: int
+    result_id: int
+    progress: JobProgressOut
+    evaluator_version: str
+    source_sha256: str
+    config_digest: str
+    model_id: str
+    model_revision: str
+    input_fingerprint: str
+    knowledge_base_hash: str | None
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None
+    heartbeat_at: datetime | None
+    finished_at: datetime | None
+    attempt_count: int
+    cancellation_requested: bool
+    error: JobErrorOut | None
+    replayed: bool = False
+
+
+ClaimLabel = Literal["supported", "contradicted", "insufficient_evidence", "needs_human_review"]
+
+
+class ClaimVerdictOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    claim_text: str
+    label: ClaimLabel
+    abstained: bool
+    reason: str
+    diagnostic_branch: str
+    deciding_evidence: list[dict[str, Any]]
+    guards: list[str]
+    config: dict[str, Any]
+    model: dict[str, Any]
+    uncalibrated_scores: list[dict[str, Any]]
+    ignored_contradictions: list[dict[str, Any]]
+
+
+class ClaimAssessmentResultOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: int
+    run_id: int
+    result_id: int
+    case_key: str
+    evaluator_version: str
+    source_sha256: str
+    config_digest: str
+    model_id: str
+    model_revision: str
+    input_fingerprint: str
+    knowledge_base_hash: str | None
+    status: str
+    claims: list[ClaimVerdictOut]
+    created_at: datetime
+
+
 # ---------------------------------------------------------------- comparison & gates
 
 
@@ -530,3 +741,81 @@ class CaseGradeIn(StrictInput):
 class ModelGradesIn(StrictInput):
     judge: JudgeInfo
     grades: list[CaseGradeIn] = Field(min_length=1, max_length=5000)
+
+
+# ---------------------------------------------------------------- live chat playground
+
+
+class ChatSessionCreate(StrictInput):
+    dataset_id: int = Field(gt=0)
+    prompt_version: str = Field(default="rag-v1", min_length=1, max_length=50)
+    title: str = Field(default="New chat", max_length=200)
+
+
+class ChatSessionOut(OrmOutput):
+    id: int
+    dataset_id: int
+    dataset_name: str | None = None
+    title: str
+    prompt_version: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0
+
+
+class ChatMessageIn(StrictInput):
+    # Upper bound enforced by the service from settings (default 2000 characters).
+    content: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20_000)
+    ]
+
+
+class ChatMessageOut(OrmOutput):
+    id: int
+    role: Literal["user", "assistant"]
+    content: str
+    trace: dict[str, Any] | None = None
+    saved_test_case_id: int | None = None
+    created_at: datetime
+
+
+class ChatSessionDetail(ChatSessionOut):
+    messages: list[ChatMessageOut] = Field(default_factory=list)
+
+
+class ChatTurnOut(BaseModel):
+    session: ChatSessionOut
+    user_message: ChatMessageOut
+    assistant_message: ChatMessageOut
+
+
+class ChatStatusOut(BaseModel):
+    enabled: bool
+    backend: Literal["off", "fixture", "mlx"]
+    model_id: str | None
+    model_revision: str | None
+    loaded: bool
+    busy: bool
+    prompt_versions: list[str]
+    max_message_chars: int
+    history_exchanges: int
+    scope: str = "local-only, authenticated API; chat checks are lexical spot checks"
+
+
+class SaveChatTestCaseIn(StrictInput):
+    """Human-labelled test case from a chat turn. Gold evidence is chosen by a person;
+    the model's answer is never copied in as an expected output."""
+
+    key: Key
+    input: str | None = Field(default=None, min_length=1, max_length=MAX_TEXT)
+    relevant_passage_ids: list[PassageId] = Field(default_factory=list, max_length=20)
+    expect_abstain: bool = False
+    required_terms: list[Term] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def _human_label(self) -> SaveChatTestCaseIn:
+        if self.expect_abstain and self.relevant_passage_ids:
+            raise ValueError("a should-decline case cannot list gold passages")
+        if not self.expect_abstain and not self.relevant_passage_ids:
+            raise ValueError("select at least one gold passage, or mark the case should-decline")
+        return self

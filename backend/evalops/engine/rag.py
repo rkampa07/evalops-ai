@@ -148,6 +148,9 @@ class BM25Index:
         self.ids = sorted(passages)
         self.docs = {pid: Counter(self._terms(passages[pid])) for pid in self.ids}
         self.lengths = {pid: sum(c.values()) for pid, c in self.docs.items()}
+        # Number of indexed token occurrences. Also used by the bounded chat index cache to
+        # avoid retaining an index whose Python Counter structures would be too large.
+        self.term_count = sum(self.lengths.values())
         self.avg_len = sum(self.lengths.values()) / len(self.ids)
         df = Counter(term for c in self.docs.values() for term in c)
         n = len(self.ids)
@@ -173,6 +176,10 @@ class BM25Index:
 
     def search(self, query: str, k: int) -> list[str]:
         scores = self.score(query)
+        return self.rank(scores, k)
+
+    def rank(self, scores: Mapping[str, float], k: int) -> list[str]:
+        """Return the same deterministic top-k order from an already-computed score map."""
         ranked = sorted(self.ids, key=lambda pid: (-scores[pid], pid))
         return ranked[:k]
 

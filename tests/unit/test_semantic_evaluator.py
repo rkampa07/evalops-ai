@@ -942,16 +942,15 @@ SWEEP_CASES += [
 ]
 
 
-# ------------------------------------------------------------------ Stage 1: scoped contradiction screening
+# -------------------------------------------------------- Stage 1: scoped contradiction screening
+
 
 def test_stage1_supported_claim_ignores_unrelated_model_contradiction():
     claim = "Members can cancel a booking before arrival."
     policy = "Members can cancel a booking before arrival."
     unrelated = "Pool towels must be returned before checkout."
     model = scripted_exact({policy: ENTAIL, unrelated: CONTRA})
-    verdict = SemanticVerifier(model, NO_Q).verify(
-        "q", claim, {"P-1": policy, "P-2": unrelated}
-    )
+    verdict = SemanticVerifier(model, NO_Q).verify("q", claim, {"P-1": policy, "P-2": unrelated})
     assert verdict.label == SUPPORTED
     assert verdict.ignored_contradictions[0]["kind"] == "unrelated"
 
@@ -961,9 +960,7 @@ def test_stage1_supported_claim_ignores_opposite_numeric_condition():
     support = "Delivery is free for orders over $50."
     opposite = "Orders of $50 or less pay a $5 delivery fee."
     model = scripted_exact({support: ENTAIL, opposite: CONTRA})
-    verdict = SemanticVerifier(model, NO_Q).verify(
-        "q", claim, {"P-1": support, "P-2": opposite}
-    )
+    verdict = SemanticVerifier(model, NO_Q).verify("q", claim, {"P-1": support, "P-2": opposite})
     assert verdict.label == SUPPORTED
     assert verdict.ignored_contradictions[0]["kind"] == "complementary"
 
@@ -1006,9 +1003,7 @@ def test_stage1_specific_policy_exception_still_blocks_approval():
     general = "Most items can be returned within 30 days."
     exception = "Gift cards cannot be returned."
     model = scripted_exact({general: ENTAIL, exception: CONTRA})
-    verdict = SemanticVerifier(model, NO_Q).verify(
-        "q", claim, {"P-1": general, "P-2": exception}
-    )
+    verdict = SemanticVerifier(model, NO_Q).verify("q", claim, {"P-1": general, "P-2": exception})
     assert verdict.label != SUPPORTED
     assert verdict.label in (CONTRADICTED, NEEDS_REVIEW)
 
@@ -1346,9 +1341,9 @@ def test_v11_return_eligibility_conditions_do_not_restrict_refund_destination():
         "payment method. Items must be unused and in their original packaging."
     )
     claim = "Refunds for returned items go back to the original payment method."
-    verdict = SemanticVerifier(scripted([(policy.split(". ")[0], "original payment method", ENTAIL)])).verify(
-        "Where does the refund go?", claim, {"RET": policy}
-    )
+    verdict = SemanticVerifier(
+        scripted([(policy.split(". ")[0], "original payment method", ENTAIL)])
+    ).verify("Where does the refund go?", claim, {"RET": policy})
     assert verdict.label == SUPPORTED and verdict.guards == []
 
 
@@ -1404,17 +1399,17 @@ def test_v11_unrelated_shared_actor_does_not_trigger_possible_exception():
         "promise credits, discounts, or compensation."
     }
     claim = "Chat support is staffed only by human agents."
-    verdict = SemanticVerifier(scripted_exact({}), AggregationConfig(include_question=False)).verify(
-        "Is chat support run by people?", claim, evidence
-    )
+    verdict = SemanticVerifier(
+        scripted_exact({}), AggregationConfig(include_question=False)
+    ).verify("Is chat support run by people?", claim, evidence)
     assert verdict.label == INSUFFICIENT and verdict.guards == []
 
 
 def test_v11_specific_opposite_policy_still_triggers_possible_exception():
     policy = "Rare maps cannot be borrowed."
-    verdict = SemanticVerifier(scripted_exact({}), AggregationConfig(include_question=False)).verify(
-        "Can I borrow one?", "Rare maps can be borrowed.", {"LIB": policy}
-    )
+    verdict = SemanticVerifier(
+        scripted_exact({}), AggregationConfig(include_question=False)
+    ).verify("Can I borrow one?", "Rare maps can be borrowed.", {"LIB": policy})
     assert verdict.label == NEEDS_REVIEW and verdict.guards == ["possible_exception"]
 
 
@@ -1641,5 +1636,9 @@ def test_v8_exhaustive_sweep_approval_invariant(claim, ev):
             assert verdict.label != SUPPORTED, (claim, combo)
             if CONTRA in combo and verdict.label == INSUFFICIENT:
                 kinds = {i["kind"] for i in verdict.ignored_contradictions}
-                assert kinds <= {"unrelated", "complementary", "different_concept"}, (claim, combo, kinds)
+                assert kinds <= {"unrelated", "complementary", "different_concept"}, (
+                    claim,
+                    combo,
+                    kinds,
+                )
     assert checked == 3 ** len(units)

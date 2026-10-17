@@ -2,20 +2,32 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..engine.versioning import case_definition, definition_hash
-from ..errors import ConflictError, NotFoundError, UnprocessableError
+from ..errors import ConflictError, NotFoundError, QuotaExceededError, UnprocessableError
 from ..models import Dataset, Passage, TestCase
+from ..quotas import (
+    begin_workspace_write,
+    count_datasets,
+    count_passages,
+    count_test_cases,
+)
 from ..repositories.datasets import DatasetRepository, TestCaseRepository
 from ..schemas import (
     DatasetCreate,
     DatasetOut,
     DatasetUpdate,
+    Page,
     PassageIn,
+    PassageOut,
     PassageUpdate,
     TestCaseCreate,
+    TestCaseOut,
     TestCaseUpdate,
 )
 
@@ -34,41 +46,82 @@ _CASE_FIELDS = (
 
 
 class DatasetService:
-    def __init__(self, session: Session):
+    def __init__(
+        self,
+        session: Session,
+        *,
+        workspace_id: int = 1,
+        max_datasets: int = 20,
+        max_test_cases_per_dataset: int = 10_000,
+        max_passages_per_workspace: int = 25_000,
+    ):
         self.s = session
+        self.workspace_id = workspace_id
+        self.max_datasets = max_datasets
+        self.max_test_cases_per_dataset = max_test_cases_per_dataset
+        self.max_passages_per_workspace = max_passages_per_workspace
         self.datasets = DatasetRepository(session)
         self.cases = TestCaseRepository(session)
 
     # ------------------------------------------------------------ datasets
 
     def _out(
-        self, ds: Dataset, case_counts: dict[int, int], run_counts: dict[int, int]
+        self,
+        ds: Dataset,
+        case_counts: dict[int, int],
+        run_counts: dict[int, int],
+        passage_counts: dict[int, int],
     ) -> DatasetOut:
         out = DatasetOut.model_validate(ds)
         out.test_case_count = case_counts.get(ds.id, 0)
         out.run_count = run_counts.get(ds.id, 0)
-        out.passage_count = len(ds.passages)
+        out.passage_count = passage_counts.get(ds.id, 0)
         return out
 
-    def list_datasets(self) -> list[DatasetOut]:
-        cases, runs = self.datasets.counts()
-        return [self._out(ds, cases, runs) for ds in self.datasets.list()]
+    def list_datasets(
+        self, *, limit: int | None = None, offset: int | None = None
+    ) -> list[DatasetOut] | Page[DatasetOut]:
+        paginated = limit is not None or offset is not None
+        page_limit = (limit or 50) if paginated else None
+        page_offset = offset or 0
+        datasets = self.datasets.list(
+            workspace_id=self.workspace_id, limit=page_limit, offset=page_offset
+        )
+        dataset_ids = [ds.id for ds in datasets]
+        aggregate_ids = dataset_ids
+        cases, runs = self.datasets.counts(aggregate_ids)
+        passages = self.datasets.passage_counts(aggregate_ids)
+        items = [self._out(ds, cases, runs, passages) for ds in datasets]
+        if not paginated:
+            return items
+        return Page(
+            items=items,
+            total=self.datasets.count_datasets(workspace_id=self.workspace_id),
+            limit=page_limit,
+            offset=page_offset,
+        )
 
     def get_dataset(self, dataset_id: int) -> Dataset:
-        ds = self.datasets.get(dataset_id)
+        ds = self.datasets.get(dataset_id, workspace_id=self.workspace_id)
         if ds is None:
             raise NotFoundError(f"dataset {dataset_id} not found")
         return ds
 
     def get_dataset_out(self, dataset_id: int) -> DatasetOut:
         ds = self.get_dataset(dataset_id)
-        cases, runs = self.datasets.counts()
-        return self._out(ds, cases, runs)
+        cases, runs = self.datasets.counts([ds.id])
+        passages = self.datasets.passage_counts([ds.id])
+        return self._out(ds, cases, runs, passages)
 
     def create_dataset(self, data: DatasetCreate) -> DatasetOut:
-        if self.datasets.get_by_name(data.name):
+        begin_workspace_write(self.s, self.workspace_id)
+        if count_datasets(self.s, self.workspace_id) >= self.max_datasets:
+            raise QuotaExceededError("workspace dataset limit reached")
+        if self.datasets.get_by_name(data.name, workspace_id=self.workspace_id):
             raise ConflictError(f"dataset named {data.name!r} already exists")
-        ds = self.datasets.add(Dataset(name=data.name, description=data.description))
+        ds = self.datasets.add(
+            Dataset(name=data.name, description=data.description, workspace_id=self.workspace_id)
+        )
         self.s.commit()
         return self.get_dataset_out(ds.id)
 
@@ -80,7 +133,11 @@ class DatasetService:
         if changes.get("description") is None:
             changes.pop("description", None)
         new_name = changes.get("name")
-        if new_name and new_name != ds.name and self.datasets.get_by_name(new_name):
+        if (
+            new_name
+            and new_name != ds.name
+            and self.datasets.get_by_name(new_name, workspace_id=self.workspace_id)
+        ):
             raise ConflictError(f"dataset named {new_name!r} already exists")
         for field, value in changes.items():
             setattr(ds, field, value)
@@ -98,23 +155,43 @@ class DatasetService:
 
     # ------------------------------------------------------------ test cases
 
-    def list_cases(self, dataset_id: int) -> list[TestCase]:
+    def list_cases(
+        self,
+        dataset_id: int,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[TestCase] | Page[TestCaseOut]:
         self.get_dataset(dataset_id)
-        return self.cases.list_for_dataset(dataset_id)
+        paginated = limit is not None or offset is not None
+        page_limit = (limit or 50) if paginated else None
+        page_offset = offset or 0
+        cases = self.cases.list_for_dataset(dataset_id, limit=page_limit, offset=page_offset)
+        if not paginated:
+            return cases
+        return Page(
+            items=[TestCaseOut.model_validate(case) for case in cases],
+            total=self.cases.count_for_dataset(dataset_id),
+            limit=page_limit,
+            offset=page_offset,
+        )
 
     def get_case(self, case_id: int) -> TestCase:
-        case = self.cases.get(case_id)
+        case = self.cases.get(case_id, workspace_id=self.workspace_id)
         if case is None:
             raise NotFoundError(f"test case {case_id} not found")
         return case
 
     def create_cases(self, dataset_id: int, items: list[TestCaseCreate]) -> list[TestCase]:
         """Create one or many cases atomically; any key conflict rejects the whole batch."""
+        begin_workspace_write(self.s, self.workspace_id)
         dataset = self.get_dataset(dataset_id)
         keys = [c.key for c in items]
-        dupes = sorted({k for k in keys if keys.count(k) > 1})
+        dupes = sorted(key for key, count in Counter(keys).items() if count > 1)
         if dupes:
             raise UnprocessableError(f"duplicate keys in request: {dupes}")
+        if count_test_cases(self.s, dataset_id) + len(items) > self.max_test_cases_per_dataset:
+            raise QuotaExceededError("dataset test-case limit reached")
         clash = sorted(self.cases.existing_keys(dataset_id) & set(keys))
         if clash:
             raise ConflictError(f"test case key(s) already exist in dataset: {clash}")
@@ -179,8 +256,26 @@ class DatasetService:
 
     # ------------------------------------------------------------ knowledge base passages
 
-    def list_passages(self, dataset_id: int) -> list[Passage]:
-        return list(self.get_dataset(dataset_id).passages)
+    def list_passages(
+        self,
+        dataset_id: int,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[Passage] | Page[PassageOut]:
+        self.get_dataset(dataset_id)
+        paginated = limit is not None or offset is not None
+        page_limit = (limit or 50) if paginated else None
+        page_offset = offset or 0
+        passages = self.datasets.list_passages(dataset_id, limit=page_limit, offset=page_offset)
+        if not paginated:
+            return passages
+        return Page(
+            items=[PassageOut.model_validate(passage) for passage in passages],
+            total=self.datasets.passage_count(dataset_id),
+            limit=page_limit,
+            offset=page_offset,
+        )
 
     def _get_passage(self, dataset: Dataset, passage_id: str) -> Passage:
         for passage in dataset.passages:
@@ -190,12 +285,21 @@ class DatasetService:
 
     def create_passages(self, dataset_id: int, items: list[PassageIn]) -> list[Passage]:
         """Create passages atomically; duplicate ids reject the whole batch."""
+        begin_workspace_write(self.s, self.workspace_id)
         dataset = self.get_dataset(dataset_id)
         ids = [p.passage_id for p in items]
-        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        dupes = sorted(pid for pid, count in Counter(ids).items() if count > 1)
         if dupes:
             raise UnprocessableError(f"duplicate passage ids in request: {dupes}")
-        clash = sorted({p.passage_id for p in dataset.passages} & set(ids))
+        if count_passages(self.s, self.workspace_id) + len(items) > self.max_passages_per_workspace:
+            raise QuotaExceededError("workspace knowledge-base passage limit reached")
+        clash = sorted(
+            self.s.scalars(
+                select(Passage.passage_id).where(
+                    Passage.dataset_id == dataset_id, Passage.passage_id.in_(ids)
+                )
+            )
+        )
         if clash:
             raise ConflictError(f"passage id(s) already exist in dataset: {clash}")
         rows = [Passage(dataset_id=dataset_id, **p.model_dump()) for p in items]

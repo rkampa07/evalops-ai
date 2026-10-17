@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from evalops.db import run_migrations
 
@@ -13,6 +13,9 @@ def test_migrations_create_schema_and_are_idempotent(tmp_path):
             insp = inspect(conn)
             tables = set(insp.get_table_names())
             uniques = {u["name"] for u in insp.get_unique_constraints("test_cases")}
+            queue_count = conn.execute(
+                text("SELECT queued_count FROM evaluation_job_queue_state WHERE id = 1")
+            ).scalar()
     finally:
         engine.dispose()
     assert {
@@ -20,9 +23,12 @@ def test_migrations_create_schema_and_are_idempotent(tmp_path):
         "test_cases",
         "evaluation_runs",
         "evaluation_results",
+        "evaluation_jobs",
+        "evaluation_job_queue_state",
         "alembic_version",
     } <= tables
     assert "uq_test_case_dataset_key" in uniques
+    assert queue_count == 0
 
 
 def test_migration_matches_orm_models(tmp_path):
@@ -181,8 +187,14 @@ def test_upgrade_preserves_and_backfills_legacy_data(tmp_path):
         else:  # edited after the runs: the scored definition can't be proven -> unknown
             assert (case_hash, case_version) == (None, None)
 
-    settings = Settings(database_url=url, allowed_hosts=["testserver"], cors_origins=[])
-    with TestClient(create_app(settings)) as c:
+    settings = Settings(
+        database_url=url,
+        allowed_hosts=["testserver"],
+        cors_origins=[],
+        auth_mode="development",
+        environment="development",
+    )
+    with TestClient(create_app(settings), client=("127.0.0.1", 50000)) as c:
         cmp = c.get("/evaluations/compare", params={"baseline_run_id": 1, "candidate_run_id": 2})
         assert cmp.status_code == 200, cmp.text
         body = cmp.json()

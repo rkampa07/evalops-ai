@@ -44,5 +44,11 @@ examples/rag/live/
 /experiments/*
 !/experiments/semantic-eval/
 /experiments/semantic-eval/*
+!/experiments/semantic-eval/CITATION_RUBRIC_CLARIFICATIONS.md
+!/experiments/semantic-eval/EVALUATION_REPORT.md
+!/experiments/semantic-eval/ai_review.py
+!/experiments/semantic-eval/check_benchmark.py
 !/experiments/semantic-eval/citation_evaluator.py
+!/experiments/semantic-eval/run_experiment.py
+!/experiments/semantic-eval/score.py
 !/experiments/semantic-eval/test_citation_evaluator.py

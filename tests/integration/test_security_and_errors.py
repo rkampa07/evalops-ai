@@ -73,10 +73,15 @@ def test_request_body_size_limit(db_url):
 
     app = create_app(
         Settings(
-            database_url=db_url, cors_origins=[], max_body_bytes=200, allowed_hosts=["testserver"]
+            database_url=db_url,
+            cors_origins=[],
+            max_body_bytes=200,
+            allowed_hosts=["testserver"],
+            auth_mode="development",
+            environment="development",
         )
     )
-    with TestClient(app) as c:
+    with TestClient(app, client=("127.0.0.1", 50000)) as c:
         r = c.post("/datasets", json={"name": "x", "description": "y" * 500})
         assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large"
         assert c.post("/datasets", json={"name": "ok"}).status_code == 201
