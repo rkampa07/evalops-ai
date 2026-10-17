@@ -3,14 +3,17 @@ PY      := backend/.venv/bin/python
 PIP     := backend/.venv/bin/pip
 API_URL ?= http://127.0.0.1:8000
 
-.PHONY: setup setup-local-ai backend frontend seed migrate test test-backend test-frontend lint check clean-db \
-	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import lock e2e e2e-install
+.PHONY: setup setup-local-ai backend chat chat-fixture frontend seed migrate test test-backend test-frontend lint check clean-db \
+	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import lock e2e e2e-install \
+	assessment-demo-backend assessment-demo-seed assessment-demo-worker clean-assessment-demo-db
 
 GEN_MODEL   ?= mlx-community/Qwen2.5-1.5B-Instruct-4bit
 JUDGE_MODEL ?= mlx-community/Llama-3.2-3B-Instruct-4bit
 RAG         := examples/rag
 # Live generation/judging writes here (git-ignored); committed recordings are never overwritten.
 LIVE        := $(RAG)/live
+ASSESS_DEMO_DB     := $(CURDIR)/backend/data/assessment_demo.db
+ASSESS_DEMO_DB_URL := sqlite:///$(ASSESS_DEMO_DB)
 
 setup:            ## Create the venv and install backend + frontend dependencies
 	test -d backend/.venv || python3 -m venv backend/.venv
@@ -24,7 +27,13 @@ setup-local-ai:   ## Optional: MLX for local generation/judging (models are down
 	$(PIP) install -q --no-deps --no-build-isolation -e .
 
 backend:          ## Run the API on http://127.0.0.1:8000 (auto-migrates)
-	cd backend && .venv/bin/uvicorn evalops.main:app --host 127.0.0.1 --port 8000 --reload
+	cd backend && EVALOPS_ENV=$${EVALOPS_ENV:-development} EVALOPS_AUTH_MODE=$${EVALOPS_AUTH_MODE:-development} .venv/bin/uvicorn evalops.main:app --host 127.0.0.1 --port 8000 --reload
+
+chat-fixture:     ## API with live chat using the deterministic fixture backend (no model)
+	cd backend && EVALOPS_ENV=$${EVALOPS_ENV:-development} EVALOPS_AUTH_MODE=$${EVALOPS_AUTH_MODE:-development} EVALOPS_CHAT_BACKEND=fixture .venv/bin/uvicorn evalops.main:app --host 127.0.0.1 --port 8000 --reload
+
+chat:             ## API with live chat on the local MLX model (needs setup-local-ai + downloaded model)
+	cd backend && EVALOPS_ENV=$${EVALOPS_ENV:-development} EVALOPS_AUTH_MODE=$${EVALOPS_AUTH_MODE:-development} EVALOPS_CHAT_BACKEND=mlx .venv/bin/uvicorn evalops.main:app --host 127.0.0.1 --port 8000
 
 frontend:         ## Run the UI on http://127.0.0.1:5173
 	cd frontend && npm run dev
@@ -95,3 +104,17 @@ e2e:              ## Playwright browser tests against a real API + UI on ports 8
 
 e2e-install:      ## Install the Chromium version used by Playwright
 	cd frontend && npm run test:e2e:install
+
+# ---------------------------------------------------------------- Assessment Demo (Phase 5F)
+
+assessment-demo-backend: ## Run the API on http://127.0.0.1:8000 using isolated assessment_demo.db
+	cd backend && EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" EVALOPS_ENV=development EVALOPS_AUTH_MODE=development EVALOPS_API_JOB_SUBMISSIONS_RPM=60 .venv/bin/uvicorn evalops.main:app --host 127.0.0.1 --port 8000
+
+assessment-demo-seed:    ## Seed RAG dataset and recorded runs into the running demo API (no model needed)
+	$(PY) backend/scripts/rag_demo.py --base-url $(API_URL)
+
+assessment-demo-worker:  ## Run frozen citation worker + simulated claim worker on isolated assessment_demo.db
+	EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" $(PY) backend/scripts/assessment_demo_worker.py
+
+clean-assessment-demo-db: ## Safely remove only backend/data/assessment_demo.db and sidecars when idle
+	EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" $(PY) backend/scripts/assessment_demo_worker.py --clean-db

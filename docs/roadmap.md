@@ -23,10 +23,10 @@ Ordered by customer value per unit of effort. Items marked **(semantic)** would 
 
 ## Production readiness
 
-- Authentication (OIDC) and per-project roles; API tokens for CI.
-- Postgres support (SQLAlchemy and Alembic are already in place), background scoring for very large runs.
-- Containerized deployment, structured logging, metrics, and an audit log of gate decisions.
-- Multi-tenant isolation and data-retention controls for customer outputs.
+- Headless API tokens for CI (browser OIDC login, opaque sessions, CSRF protection, and per-workspace `owner`/`admin`/`editor`/`viewer` RBAC are implemented).
+- PostgreSQL multi-host deployment validation (SQLAlchemy, Alembic, workspace quotas, and lease-fenced background workers for runs and frozen assessments are implemented against SQLite).
+- Containerized deployment, structured logging, metrics, and an immutable audit log of gate approvals.
+- Data-retention controls and external secret-manager integration for multi-tenant customer deployments.
 
 ## Explicitly out of scope
 

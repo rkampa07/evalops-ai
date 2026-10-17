@@ -1,0 +1,163 @@
+# Isolated Local Assessment Demo Guide
+
+This guide walks through a repeatable local demonstration of EvalOps AI's opt-in frozen citation
+assessments (`citation-evaluator-v4`) and semantic claim assessments (`semantic-aggregate-v12`),
+alongside deterministic lexical scoring, regression comparison, and release gating.
+
+The demo launcher uses a dedicated SQLite database (`backend/data/assessment_demo.db`) and never
+reads, modifies, or deletes `backend/data/evalops.db`.
+
+---
+
+## 1. Evaluation Layers and Scope
+
+EvalOps AI separates release-gating metrics from opt-in per-result diagnostic assessments:
+
+| Layer | Version / Identifier | Execution Model | Role in Comparisons & Release Gates |
+|---|---|---|---|
+| **Deterministic lexical evaluation** | `methodology 2.0.0` | Synchronous on run creation (`POST /evaluations/runs`) or via `EvaluationJobWorker` | **Primary.** Drives run summaries, baseline-vs-candidate comparisons (`GET /evaluations/compare`), and release gates (`POST /evaluations/gates`). |
+| **Model-judge grades (optional)** | `judge-v2` (`Llama-3.2-3B-Instruct-4bit`) | Offline script (`rag_judge.py`), replayed via `PUT /evaluations/runs/{id}/model-grades` | **Estimated only.** Displayed in a separate panel (`estimated_groundedness`); excluded from default release gates. |
+| **Frozen citation assessment** | `citation-evaluator-v4` | Opt-in per saved result (`POST /evaluations/runs/{run_id}/results/{result_id}/assessments` with `{"evaluator": "citation", "citation_expected": ...}`), processed by `CitationAssessmentWorker` | **Diagnostic only.** Stored in `citation_assessment_results`; never modifies lexical run metrics, summaries, comparisons, or release gates. |
+| **Frozen semantic claim assessment** | `semantic-aggregate-v12` | Opt-in per saved result (`{"evaluator": "claim"}`), processed by `ClaimAssessmentWorker` | **Diagnostic only.** Stored in `claim_assessment_results`; never modifies lexical run metrics, summaries, comparisons, or release gates. |
+
+### Simulated Demo Verifier Disclosure
+
+- **Citation assessments (`citation-evaluator-v4`)** run the real frozen deterministic citation
+  evaluator (`backend/evalops/citation_evaluator_v4.py`, SHA-256 verified before every prediction).
+- **Claim assessments (`semantic-aggregate-v12`)** in production worker mode (`make_local_verifier`)
+  require optional `torch` and `transformers` dependencies plus a locally cached Hugging Face
+  snapshot of `cross-encoder/nli-deberta-v3-small` at commit
+  `fa2804872c3b4bd748f38c0185cc85775361e735`.
+- **In this local demo (`make assessment-demo-worker`)**, `ClaimAssessmentWorker` is configured with
+  `SimulatedDemoClaimVerifier` (`backend/scripts/assessment_demo_worker.py`). This stub computes
+  deterministic token overlap over retrieved evidence units so the full API, queue, lease-fenced
+  worker, provenance check, and UI lifecycle can be exercised **without downloading or loading any
+  DeBERTa NLI model**.
+- Results produced by `SimulatedDemoClaimVerifier` are explicitly marked in both the API payload
+  (`guards: ["simulated_demo_verifier"]`, `model.backend: "simulated_demo_stub"`) and the UI with a
+  prominent neutral badge: **`Simulated verifier — no NLI model loaded`**, plus separate
+  **Configured model** and **Executed verifier** fields.
+
+---
+
+## 2. Startup Instructions (3 Terminals)
+
+Prerequisites: Python 3.13 (`backend/.venv` initialized via `make setup`) and Node 22 (`frontend/node_modules` installed). Ports `127.0.0.1:8000` and `127.0.0.1:5173` must be free.
+
+### Terminal 1 — Start the Isolated Demo API (`127.0.0.1:8000`)
+
+```bash
+make assessment-demo-backend
+```
+
+This starts `uvicorn evalops.main:app` with:
+- `EVALOPS_DATABASE_URL=sqlite:///<repo>/backend/data/assessment_demo.db` (auto-migrates to Alembic head `0014`),
+- `EVALOPS_ENV=development` and `EVALOPS_AUTH_MODE=development` (loopback workspace `1`, owner role),
+- `EVALOPS_API_JOB_SUBMISSIONS_RPM=60` (so interactive assessment submissions across multiple cases do not hit the default 5/minute job submission rate limit).
+
+### Terminal 2 — Seed Demo Data & Start Assessment Workers
+
+With Terminal 1 running, seed the Kestrel RAG dataset (`kestrel-policy-rag-v1`) and recorded runs
+(`rag-v1`, `rag-v2`, `rag-v3`), then start the assessment worker loop:
+
+```bash
+make assessment-demo-seed
+make assessment-demo-worker
+```
+
+- `make assessment-demo-seed` replays the committed Kestrel policy passages, 20 test cases, recorded
+  model outputs, and saved judge verdicts over HTTP into `assessment_demo.db`.
+- `make assessment-demo-worker` starts `backend/scripts/assessment_demo_worker.py`, polling
+  `assessment_demo.db` for queued citation and claim assessment jobs.
+
+### Terminal 3 — Start the Frontend UI (`127.0.0.1:5173`)
+
+```bash
+make frontend
+```
+
+Open `http://127.0.0.1:5173` in your browser.
+
+---
+
+## 3. Demonstration Walkthrough
+
+### Step A — Inspect Deterministic Run Metrics (`Run detail`)
+1. Open **Runs** in the left navigation and select the baseline `rag-v1` run (or candidate `rag-v3`).
+2. Review the top-level summary cards (**Pass rate**, **Mean token F1**, **Forbidden-term violations**,
+   **Latency p50 / p95**) and the **RAG evidence** card (**Retrieval recall@k**, **MRR**, **Citation validity**,
+   **Groundedness (lexical)**, **Abstention accuracy**).
+3. Note that all run-level metrics are computed deterministically under scoring methodology **2.0.0**.
+
+### Step B — Run a Frozen Citation Assessment (`citation-evaluator-v4`)
+1. In the **Results** table on the Run Detail page, click a case key (for example, `return-window` or
+   another answered RAG case with retrieved passages) to expand its detail row.
+2. Locate the **Assessments** section (`Separate, opt-in frozen assessments (citation-evaluator-v4 and semantic-aggregate-v12)`).
+3. Verify the **Citation expected** checkbox state and click **Run citation assessment**.
+4. Observe the status badge transition (`queued` → `running` → `succeeded`) while duplicate
+   submissions are disabled.
+5. Inspect the rendered **Citation assessment** card:
+   - Evaluator disclaimer (`citation-evaluator-v4`),
+   - Overall status badge (`correct`, `partial`, `missing_citation`, `invalid_citation`, `not_retrieved`, or `not_applicable`),
+   - Outcome reason and reason code,
+   - Provenance hashes (`config`, `input`, `kb`),
+   - Per-citation decision table with component coverage scores.
+
+### Step C — Run a Semantic Claim Assessment (`semantic-aggregate-v12` with Simulated Verifier)
+1. On the same expanded result row (or another case that has recorded `retrieved_passage_ids`), click
+   **Run claim assessment**.
+2. Observe the job lifecycle (`queued` → `running` → `succeeded`) and progress counter
+   (`completed of total`).
+3. Inspect the rendered **Claim assessment** card:
+   - Header badges: `frozen evaluator` and **`Simulated verifier — no NLI model loaded`**,
+   - **Configured model**: `cross-encoder/nli-deberta-v3-small (fa2804872c3b)`,
+   - **Executed verifier**: `demo-stub/simulated-lexical-verifier · simulated_demo_stub (simulated — no NLI weights loaded)`,
+   - **Claim verdicts** table showing each split claim, its diagnostic branch and guards
+     (`simulated_demo_verifier`), verdict badge, explicit `[SIMULATED DEMO VERIFIER ...]` reason, and
+     deciding evidence units.
+4. If a result has `retrieved_passage_ids: null`, the **Run claim assessment** button is disabled
+   with an inline explanation that recorded retrieval metadata is required.
+
+### Step D — Verify Regression Comparison & Release Gates Remain Unchanged
+1. Click **Compare** (or navigate to `/compare?baseline=1&candidate=3`) to compare `rag-v1` against
+   `rag-v3`.
+   - Confirm per-case regression classification (`regressed`, `fixed`, `unchanged`) and metric deltas.
+   - Runs with mismatched dataset versions, knowledge-base hashes, scoring configs, or major
+     methodology versions are reported as **not comparable** rather than false regressions.
+2. Click **Release report** (`/reports?run=3&baseline=1`) to evaluate the predefined release gates.
+   - Confirm that `rag-v3` remains **NOT READY** (`min_pass_rate`, `min_abstention_accuracy`, and
+     `max_regressed_cases` fail) and that running citation or claim assessments has not altered any
+     lexical metric, run summary, or gate outcome.
+
+---
+
+## 4. Known Limitations
+
+1. **Real DeBERTa NLI inference is not executed in the demo launcher:** `make assessment-demo-worker`
+   uses `SimulatedDemoClaimVerifier` so the demo runs without installing `torch`/`transformers` or
+   downloading `cross-encoder/nli-deberta-v3-small`. It does not measure or demonstrate real NLI
+   model accuracy.
+2. **Historical assessment retrieval is not implemented in the UI:** The backend exposes
+   `GET /evaluations/assessments/{assessment_id}` and `GET /evaluations/assessments/{assessment_id}/result`,
+   but does not expose a list endpoint for prior assessments on a `(run_id, result_id)` pair.
+   Collapsing a result row or refreshing the browser page clears the in-memory React state for that
+   row (while the completed assessment record remains durably stored in SQLite).
+3. **Single-active-lease worker concurrency:** `CitationAssessmentWorker` and `ClaimAssessmentWorker`
+   coordinate through a shared queue (`CitationAssessmentQueue`) and process one active assessment
+   lease at a time.
+4. **Local-only scope:** The demo backend binds to `127.0.0.1` using loopback development
+   authentication (`EVALOPS_AUTH_MODE=development`) and is designed for local single-user inspection.
+
+---
+
+## 5. Safe Shutdown and Cleanup
+
+1. **Stop the running processes:** Press `Ctrl+C` in Terminal 3 (frontend), Terminal 2 (demo worker),
+   and Terminal 1 (demo API).
+2. **Remove the isolated demo database:**
+   ```bash
+   make clean-assessment-demo-db
+   ```
+   This runs `backend/scripts/assessment_demo_worker.py --clean-db`, which verifies that no active
+   OS processes are using `assessment_demo.db` and removes only `backend/data/assessment_demo.db`
+   and its `-wal`, `-shm`, and `-journal` sidecar files. `backend/data/evalops.db` is never touched.

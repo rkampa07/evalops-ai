@@ -57,8 +57,12 @@ Have open: the UI at http://127.0.0.1:5173, and a terminal for one `curl` at the
 ## 4:00–4:45 · Same gate in CI
 
 ```bash
+CSRF=$(curl -s http://127.0.0.1:8000/auth/session \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['csrf_token'])")
 curl -s -X POST http://127.0.0.1:8000/evaluations/gates \
   -H 'Content-Type: application/json' \
+  -H "X-CSRF-Token: $CSRF" \
+  -H 'X-Workspace-ID: 1' \
   -d '{"candidate_run_id": 2, "baseline_run_id": 1,
        "gates": {"min_pass_rate": 0.9, "max_forbidden_violations": 0, "max_regressed_cases": 0}}' \
   | python3 -m json.tool | head -12

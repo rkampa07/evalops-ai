@@ -56,9 +56,10 @@ flowchart LR
 
 | Layer | Responsibility | Depends on |
 |---|---|---|
-| `api/` | HTTP routing, query/body parsing, status codes | services, schemas |
+| `api/` | HTTP routing, query/body parsing, auth/CSRF/workspace dependencies, status codes | services, schemas, auth, quotas |
 | `schemas.py` | Request/response contract and input validation (bounds, patterns, `extra="forbid"`) | engine (schema-definition check) |
-| `services/` | Business rules: uniqueness, "dataset with runs can't be deleted", run scoring orchestration, report assembly, transactions | repositories, engine |
+| `services/` | Business rules: workspace isolation, uniqueness, run scoring orchestration, durable jobs, frozen citation/claim assessments, report assembly, transactions | repositories, engine |
+| `workers/` | Out-of-process lease-fenced workers for durable evaluation jobs (`worker.py`), frozen citation assessments (`citation_worker.py`), and frozen claim assessments (`claim_worker.py`) | services, repositories, engine, semantic |
 | `repositories/` | Persistence only, with no business rules | models |
 | `engine/` | Metrics, scoring, aggregation, regression detection, gates. **No I/O, no ORM.** | stdlib + `jsonschema` |
 | `errors.py` | Domain exceptions → consistent JSON error envelope; hides internals on 500 | — |
@@ -85,10 +86,10 @@ Design notes:
 
 - **Results are snapshots.** A result stores `case_key`, tags, metrics, failures and the full case definition (`case_snapshot`, `case_hash`, `case_version`) at evaluation time. Editing or deleting a test case later never rewrites history (`test_case_id` becomes `NULL` on delete).
 - **Comparisons join on `case_key` and verify `case_hash`.** A case whose definition differs between two runs is excluded rather than counted as a regression; runs with different scoring configs or incompatible methodology versions are reported as not comparable.
-- **Versions:** `datasets.version`, `test_cases.version` + `content_hash`, `evaluation_runs.dataset_version` + `methodology_version` (migration `0002`).
+- **Versions and migrations:** `datasets.version`, `test_cases.version` + `content_hash`, `evaluation_runs.dataset_version` + `methodology_version` (migration `0002`), live chat sessions (`0004`), durable evaluation jobs and retry schedules (`0005`–`0006`), workspace ownership, OIDC sessions, idempotency, and personal workspace provisioning (`0007`–`0011`), persistent rate-limit buckets (`0012`), and frozen citation and semantic claim assessments (`0013`–`0014`).
 - **Run summaries are stored** as JSON on the run. History pages and comparisons don't need to re-aggregate results.
-- `RESTRICT` on `evaluation_runs.dataset_id` means a dataset can't be deleted while runs reference it; the service returns 409 with a clear message.
-- Schema changes go through **Alembic**. `tests/integration/test_migrations.py` fails if the ORM and migrations drift apart. The API applies migrations on startup (`EVALOPS_AUTO_MIGRATE`).
+- `RESTRICT` on `evaluation_runs.dataset_id` (and assessment foreign keys referencing runs/results) means a dataset or run can't be deleted while dependent records reference it; the service returns 409 with a clear message.
+- Schema changes go through **Alembic** (head `0014`). `tests/integration/test_migrations.py` fails if the ORM and migrations drift apart. The API applies migrations on startup (`EVALOPS_AUTO_MIGRATE`).
 
 ## Request flow: creating a run
 
@@ -122,19 +123,19 @@ Comparison (`GET /evaluations/compare`), gates (`POST /evaluations/gates`) and r
 - Charts are hand-written SVG to avoid a heavyweight chart dependency on an 8 GB machine.
 - Shareable state lives in the URL (`/compare?baseline=1&candidate=2`, `/reports?run=2&baseline=1`).
 
-## Security posture (local MVP)
+## Security posture
 
 | Concern | Control |
 |---|---|
-| CORS | Allow-list from `EVALOPS_CORS_ORIGINS` (default: the Vite dev origin only); `*` is dropped; no credentials |
+| CORS | Explicit origin allow-list from `EVALOPS_CORS_ORIGINS` (default: the local Vite dev origins only); `*` is dropped; credentials enabled only for allow-listed origins |
 | Input validation | Pydantic bounds on every field, key/tag patterns, unknown fields rejected, JSON Schemas validated before storage |
 | Payload size | Per-field limits plus a 10 MiB `Content-Length` cap (413) |
 | DNS rebinding | `TrustedHostMiddleware` with an allow-list from `EVALOPS_ALLOWED_HOSTS` (default `localhost,127.0.0.1`; `*` is dropped) |
 | ReDoS | JSON Schema `pattern` matched with a per-match timeout and per-run budget; `patternProperties` rejected (see methodology) |
 | Error leakage | 500s return a generic message; validation errors omit echoed input |
-| Secrets | None required; `.env` is git-ignored; `.env.example` contains no secrets |
+| Secrets | None required for local development; `.env` is git-ignored; `.env.example` contains no secrets |
 | SQL injection | SQLAlchemy parameterized queries only |
-| Auth | **None.** The service binds to `127.0.0.1` and is intended for single-user local use. See the roadmap. |
+| Auth, CSRF & RBAC | OIDC Authorization Code + PKCE with opaque server-side sessions (`HttpOnly`, `SameSite=Lax`), `X-CSRF-Token` enforcement on state-changing requests, workspace-scoped RBAC (`owner`/`admin`/`editor`/`viewer` via `X-Workspace-ID`), and persistent rate-limit buckets. `EVALOPS_AUTH_MODE=development` provides a loopback-only (`127.0.0.1`) development identity confined to the Default Workspace (`id = 1`). See [authentication.md](authentication.md) and [resource-quotas.md](resource-quotas.md). |
 
 Known gap: the body-size check relies on `Content-Length`. Chunked uploads without that header are bounded only by the per-field limits.
 

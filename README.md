@@ -9,8 +9,10 @@ cheaper model, actually safe to release?*
 
 ![Comparing a candidate prompt with production: regression detected](docs/images/compare-rag.png)
 
-> **Scope:** a local, single-user portfolio project. It runs on a laptop with free local models
-> and has no authentication. See [Security and scope](#security-and-scope).
+> **Scope:** a local portfolio project running on a laptop with SQLite and optional local models.
+> Includes OIDC browser sessions, CSRF protection, workspace-scoped RBAC (`owner`/`admin`/`editor`/`viewer`),
+> durable background job queues, and opt-in per-result frozen citation and claim assessments. See
+> [Security and scope](#security-and-scope) and [Assessment demo](docs/assessment-demo.md).
 
 ## Why it matters
 
@@ -29,10 +31,12 @@ and blocks the release when a predefined gate fails.
 | Area | Capability |
 |---|---|
 | **Datasets** | Test cases with reference answers, required/forbidden terms, JSON Schema, latency limits; RAG cases with knowledge-base passages, gold passages and "should decline" questions. Definitions are versioned and hashed |
-| **Evaluations** | Deterministic scoring of recorded answers: exact match, token F1, term checks, schema validation, latency; for RAG, retrieval recall@k and MRR, citation validity, claim-level lexical groundedness and abstention |
+| **Evaluations** | Deterministic scoring of recorded answers (`methodology 2.0.0`): exact match, token F1, term checks, schema validation, latency; for RAG, retrieval recall@k and MRR, citation validity, claim-level lexical groundedness and abstention |
+| **Frozen assessments (opt-in)** | Per-result asynchronous citation assessments (`citation-evaluator-v4`) and semantic claim assessments (`semantic-aggregate-v12`) executed by lease-fenced background workers with immutable provenance hashes. Strictly separate from lexical metrics and release gates |
 | **Comparisons** | Baseline vs candidate, per case (`regressed`, `fixed`, …) and per metric. Runs scored with a different methodology, scoring config, knowledge base or case definition are reported as **not comparable**, never as a regression |
 | **Release gates** | Thresholds fixed in advance; comparison gates fail closed; JSON and Markdown readiness reports |
 | **Local AI (optional)** | Qwen2.5-1.5B generates answers and Llama-3.2-3B grades claims, both 4-bit via MLX on Apple Silicon. Model grades are a separate *estimated* category that never changes pass/fail |
+| **Live playground (opt-in)** | Chat with the policy assistant and inspect each turn: BM25 scores, the exact prompt, model settings and metrics, and a *lexical* check. Save a question as a test case with human-chosen evidence. Separate from runs and gates |
 | **Reproducibility** | Recorded answers with model revision, prompt hash and decoding settings; replay without a model; hash-pinned dependency locks; live outputs can't overwrite committed evidence |
 
 **Stack:** FastAPI · SQLAlchemy/Alembic · SQLite · React + TypeScript (Vite) · MLX (optional) ·
@@ -46,18 +50,51 @@ flowchart LR
         GEN["rag_generate.py<br/>BM25 + Qwen 1.5B (MLX)"]
         JUD["rag_judge.py<br/>Llama 3B judge (MLX)"]
     end
+    subgraph Workers["Lease-fenced background workers"]
+        CITW["CitationAssessmentWorker<br/>citation-evaluator-v4"]
+        CLMW["ClaimAssessmentWorker<br/>semantic-aggregate-v12"]
+    end
     APP["Your AI app<br/>(any provider)"] -- "answers + latency" --> API
     GEN -- "recorded answers + metadata" --> API
     JUD -- "estimated verdicts" --> API
     UI["React + TypeScript UI"] <--> API["FastAPI<br/>service layer"]
     API --> ENG["Pure scoring engine<br/>(deterministic, methodology 2.0.0)"]
     API --> DB[("SQLite<br/>Alembic migrations")]
+    CITW <--> DB
+    CLMW <--> DB
     CI["CI / release pipeline"] -- "POST /evaluations/gates" --> API
 ```
 
-The API never loads a model. Scoring is a pure, deterministic engine; model-based judging is an
-optional offline step whose results are stored and shown separately. Details:
+The API never loads a model. Synchronous run scoring uses a pure, deterministic engine; model-based
+judging is an optional offline step; opt-in per-result citation and claim assessments run in
+separate worker processes coordinated via SQLite leases. Details:
 [docs/architecture.md](docs/architecture.md).
+
+## Evaluation layers: lexical scoring vs. frozen assessments
+
+1. **Deterministic lexical evaluation (`methodology 2.0.0`):** Computes run-level and per-case
+   metrics (`exact_match`, `token_f1`, term checks, JSON Schema, latency, and RAG lexical
+   `groundedness`, `citation_validity`, `retrieval_recall_at_k`, `mrr`, and `abstention_accuracy`).
+   Only these deterministic metrics feed run summaries, baseline-vs-candidate comparisons
+   (`GET /evaluations/compare`), and release gates (`POST /evaluations/gates`).
+2. **Frozen citation assessments (`citation-evaluator-v4`):** Opt-in, per-result worker jobs
+   (`CitationAssessmentWorker`) that run the SHA-256-verified `citation-evaluator-v4` predictor over
+   recorded output text, question snapshot, retrieved passage IDs, and verified knowledge-base text,
+   returning an overall citation status (`correct`, `partial`, `missing_citation`,
+   `invalid_citation`, `not_retrieved`, `not_applicable`) and per-citation coverage decisions.
+3. **Frozen semantic claim assessments (`semantic-aggregate-v12`):** Opt-in, per-result worker jobs
+   (`ClaimAssessmentWorker`) that split a response into claims and evaluate each claim against
+   recorded retrieved passages (`supported`, `contradicted`, `insufficient_evidence`,
+   `needs_human_review`).
+   - **Production worker verifier:** Configured for `cross-encoder/nli-deberta-v3-small` at pinned
+     commit `fa2804872c3b4bd748f38c0185cc85775361e735` (loaded strictly from a verified local
+     Hugging Face cache when `torch` and `transformers` are installed; fails closed with
+     `model_unavailable` otherwise).
+   - **Simulated demo verifier (`make assessment-demo-worker`):** For model-free local demos, the
+     demo launcher injects `SimulatedDemoClaimVerifier`—a deterministic lexical-overlap stub that
+     **never loads or runs the DeBERTa NLI model**. The UI explicitly labels these results with a
+     neutral badge (**`Simulated verifier — no NLI model loaded`**) and separates **Configured model**
+     from **Executed verifier**.
 
 ## Scoring methodology 2.0.0
 
@@ -154,7 +191,7 @@ Requirements: macOS or Linux, Python 3.13, Node 22. No Docker, API keys or paid 
 
 ```bash
 make setup          # backend/.venv from hash-pinned locks + npm ci
-make backend        # API on http://127.0.0.1:8000  (OpenAPI docs at /docs)
+make backend        # API on http://127.0.0.1:8000 with explicit loopback development identity
 make frontend       # UI  on http://127.0.0.1:5173  (second terminal)
 make seed           # support-assistant demo (12 cases, 3 runs)
 make rag-demo       # RAG demo: replays recorded answers + saved judge verdicts, no model needed
@@ -164,6 +201,22 @@ make rag-demo       # RAG demo: replays recorded answers + saved judge verdicts,
 your local database (or reuses existing 2.0.0 runs) and never modifies the recordings. Then open **Compare** (baseline `rag-v1`,
 candidate `rag-v2` or `rag-v3`) and **Release reports**. Walkthrough:
 [three-minute demo](docs/demo-3-minute.md).
+
+**Isolated assessment demo (no AI model required).** To exercise per-result frozen citation
+assessments (`citation-evaluator-v4`) and simulated claim assessments (`semantic-aggregate-v12` with
+`SimulatedDemoClaimVerifier`) against an isolated SQLite database (`backend/data/assessment_demo.db`)
+without touching `backend/data/evalops.db`:
+
+```bash
+make assessment-demo-backend   # terminal 1: API on :8000 using assessment_demo.db
+make assessment-demo-seed      # terminal 2: seed Kestrel RAG dataset + recorded runs
+make assessment-demo-worker    # terminal 2: start citation worker + simulated claim worker
+make frontend                  # terminal 3: UI on :5173
+# After stopping terminals 1–3 with Ctrl+C:
+make clean-assessment-demo-db  # removes only backend/data/assessment_demo.db and sidecars
+```
+
+Full walkthrough: [Assessment demo guide](docs/assessment-demo.md).
 
 Optional, Apple Silicon only, to regenerate answers with local models (~400 MB of packages plus
 2.7 GB of model downloads that you start yourself):
@@ -178,6 +231,11 @@ make rag-generate && make rag-demo-live
 Live generation and judging write only to `examples/rag/live/` (git-ignored). The scripts refuse to
 overwrite committed evidence.
 
+**Live playground.** Chat is off by default. Start the API with `make chat-fixture` (deterministic
+stand-in, no model) or `make chat` (real MLX inference with the downloaded Qwen model), then open
+**Live playground**. Each reply has an Execution Inspector; its check is lexical word overlap, not
+verified correctness. Details: [docs/chat.md](docs/chat.md).
+
 ## Testing
 
 ```bash
@@ -188,14 +246,13 @@ make e2e            # Playwright against the real API + UI with a throwaway data
 
 The backend suite covers unit, integration, migration and golden-score regression tests,
 including replay of every recorded RAG answer. GitHub Actions ([docs/ci.md](docs/ci.md)) runs the
-same checks on Ubuntu. The workflow is committed but **has not run on GitHub yet**: the repository
-has not been pushed. Browser tests: [docs/e2e.md](docs/e2e.md).
+same checks on Ubuntu. Browser tests: [docs/e2e.md](docs/e2e.md).
 
 ## Technical decisions
 
 | Decision | Why |
 |---|---|
-| Score recorded outputs; never call models from the API | Provider-agnostic, deterministic, free; generation is a separate step |
+| Score recorded outputs; evaluations never call models | Provider-agnostic, deterministic, free; generation is a separate step. The opt-in live playground is the only API path that runs a model, and its results never enter runs or gates |
 | Pure scoring engine with semantic versioning | Reproducible scores; old runs stay interpretable when rules change |
 | Fail-closed gates and compatibility checks | Missing data or a changed config must never look like a pass or a regression |
 | Lexical heuristic gates, model judge as estimate | The judge was measured, and it disagreed with labels too often to gate on |
@@ -205,8 +262,11 @@ has not been pushed. Browser tests: [docs/e2e.md](docs/e2e.md).
 
 ## Security and scope
 
-- **Local and single-user.** No authentication, roles or audit log; not production multi-user
-  infrastructure. The API binds to `127.0.0.1` and accepts only allow-listed hosts and CORS origins.
+- **Local development & workspace RBAC.** OIDC login, opaque server-side sessions, CSRF validation
+  (`X-CSRF-Token`), workspace-scoped RBAC (`owner`/`admin`/`editor`/`viewer` via `X-Workspace-ID`),
+  and persistent per-principal rate limiting are implemented; `EVALOPS_AUTH_MODE=development`
+  confines loopback requests to the reserved legacy workspace. Keep the local demo bound to
+  `127.0.0.1`. See [Authentication setup](docs/authentication.md).
 - **Input safety.** Validated request bodies with size limits; regex in JSON Schemas runs with a
   time limit; errors don't leak internals.
 - **No secrets.** No API keys are needed. Model downloads are explicit and never automatic.
@@ -217,16 +277,27 @@ has not been pushed. Browser tests: [docs/e2e.md](docs/e2e.md).
 - Only 5 of 96 labels are human-reviewed; judge calibration is provisional.
 - Lexical checks are not correctness checks. They miss paraphrase, negation and contradictions
   (see the custom-sofa example), and they don't detect hallucinations in general.
+- In the local assessment demo (`make assessment-demo-worker`), semantic claim assessments use
+  `SimulatedDemoClaimVerifier` (a deterministic lexical stub) rather than loading or running the
+  pinned `cross-encoder/nli-deberta-v3-small` model; real DeBERTa inference is not verified in the
+  browser demo.
+- Historical assessment retrieval by `(run_id, result_id)` is not implemented in the UI: collapsing
+  a result row or refreshing the page clears the in-memory assessment panel state (completed
+  assessment records remain persisted in SQLite).
+- The live playground is single-user, one generation at a time, without streaming; its check is lexical.
 - One small generator and one small judge; BM25 retrieval misses vocabulary mismatches.
 - The 20 development questions were reused for prompt tuning, and no v3–v5 prompt is release-ready.
 
 ## Documentation
 
 [Architecture](docs/architecture.md) · [Evaluation methodology](docs/evaluation-methodology.md) ·
-[RAG evaluation and calibration](docs/rag-evaluation.md) · [Labeling guideline](docs/labeling-guideline.md) ·
-[Customer scenario](docs/customer-scenario.md) · [Three-minute demo](docs/demo-3-minute.md) ·
-[Five-minute demo](docs/demo-script.md) · [Browser tests](docs/e2e.md) · [CI](docs/ci.md) ·
-[Roadmap](docs/roadmap.md)
+[RAG evaluation and calibration](docs/rag-evaluation.md) · [Assessment demo](docs/assessment-demo.md) ·
+[Citation assessments](docs/citation-assessments.md) · [Claim assessments](docs/claim-assessments.md) ·
+[Evaluation jobs](docs/evaluation-jobs.md) · [Authentication and RBAC](docs/authentication.md) ·
+[Workspace quotas and rate limits](docs/resource-quotas.md) · [Labeling guideline](docs/labeling-guideline.md) ·
+[Live playground](docs/chat.md) · [Customer scenario](docs/customer-scenario.md) ·
+[Three-minute demo](docs/demo-3-minute.md) · [Five-minute demo](docs/demo-script.md) ·
+[Browser tests](docs/e2e.md) · [CI](docs/ci.md) · [Roadmap](docs/roadmap.md)
 
 ## License
 
