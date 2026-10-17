@@ -73,6 +73,48 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>;
 }
 
+export function PaginationControls({
+  limit,
+  offset,
+  total,
+  loading = false,
+  onOffsetChange,
+}: {
+  limit: number;
+  offset: number;
+  total: number;
+  loading?: boolean;
+  onOffsetChange: (offset: number) => void;
+}) {
+  const start = total === 0 ? 0 : offset + 1;
+  const end = Math.min(offset + limit, total);
+  return (
+    <div className="pager" aria-label="Pagination">
+      <span className="muted small" aria-live="polite">
+        {start}–{end} of {total}
+      </span>
+      <button
+        type="button"
+        className="btn btn-small"
+        aria-label="Previous page"
+        disabled={loading || offset === 0}
+        onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+      >
+        Previous
+      </button>
+      <button
+        type="button"
+        className="btn btn-small"
+        aria-label="Next page"
+        disabled={loading || offset + limit >= total}
+        onClick={() => onOffsetChange(offset + limit)}
+      >
+        Next
+      </button>
+    </div>
+  );
+}
+
 /** Horizontal meter for a 0..1 rate. */
 export function Meter({ value, label }: { value: number | null; label?: string }) {
   if (value === null) return <span className="muted">n/a</span>;

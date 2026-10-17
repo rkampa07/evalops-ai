@@ -67,7 +67,8 @@ test("comparison and report explain missing run selections", async ({ page }) =>
 
 for (const resource of ["datasets", "runs"]) {
   test(`missing ${resource} displays the real API 404`, async ({ page }) => {
-    const response = page.waitForResponse((r) => r.url().endsWith(`/${resource}/999999`) && r.status() === 404);
+    const expectedSuffix = resource === "runs" ? "/evaluations/runs/999999/summary" : "/datasets/999999";
+    const response = page.waitForResponse((r) => r.url().endsWith(expectedSuffix) && r.status() === 404);
     await page.goto(`/${resource}/999999`);
     await response;
     await expect(page.getByRole("alert")).toContainText("not found");
@@ -102,11 +103,11 @@ test("new evaluation rejects invalid JSON and unknown case keys", async ({ page 
   await page.getByLabel("Model name", { exact: true }).fill("e2e-validation");
   await page.getByLabel("Prompt version", { exact: true }).fill("e2e-validation");
   await page.getByLabel("Responses JSON", { exact: true }).fill("invalid JSON");
-  await page.getByRole("button", { name: "Run evaluation", exact: true }).click();
+  await page.getByRole("button", { name: "Queue evaluation", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("Responses are not valid JSON.");
   await page.getByLabel("Responses JSON", { exact: true }).fill('[{"case_key":"nonexistent-e2e-case","output":"recorded response"}]');
-  const response = page.waitForResponse((r) => r.url().endsWith("/evaluations/runs") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Run evaluation", exact: true }).click();
+  const response = page.waitForResponse((r) => r.url().endsWith("/evaluations/jobs") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Queue evaluation", exact: true }).click();
   expect((await response).status()).toBe(422);
   await expect(page.getByRole("alert")).toContainText("nonexistent-e2e-case");
   await expect(page).toHaveURL(/\/runs\/new$/);
@@ -123,15 +124,20 @@ test("recorded JSON file creates an evaluation through the browser", async ({ pa
     await page.getByLabel("Responses JSON file", { exact: true }).setInputFiles(candidateFile);
     const recording = JSON.parse(readFileSync(candidateFile, "utf8"));
     await expect(page.getByLabel("Model name", { exact: true })).toHaveValue(recording.model_name);
-    const response = page.waitForResponse((r) => r.url().endsWith("/evaluations/runs") && r.request().method() === "POST");
-    await page.getByRole("button", { name: "Run evaluation", exact: true }).click();
+    const response = page.waitForResponse((r) => r.url().endsWith("/evaluations/jobs") && r.request().method() === "POST");
+    await page.getByRole("button", { name: "Queue evaluation", exact: true }).click();
     const created = await response;
-    expect(created.status()).toBe(201);
-    const run = await created.json();
-    runId = run.id;
+    expect(created.status()).toBe(202);
+    const queuedJob = await created.json();
+    await expect(page).toHaveURL(/\/runs\/\d+$/);
+    const completedJob = await (await request.get(`${API_URL}/evaluations/jobs/${queuedJob.job_id}`)).json();
+    expect(completedJob.status).toBe("succeeded");
+    expect(completedJob.run_id).toEqual(expect.any(Number));
+    runId = completedJob.run_id;
     await expect(page).toHaveURL(new RegExp(`/runs/${runId}$`));
     await expect(page.getByRole("heading", { name: `Run #${runId}`, exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Results (12)", exact: true })).toBeVisible();
+    const run = await (await request.get(`${API_URL}/evaluations/runs/${runId}/summary`)).json();
     expect(run.summary.passed_cases).toBe(8);
     expect(run.config.min_token_f1).toBe(recording.config.min_token_f1);
     expect(run.config.default_max_latency_ms).toBe(recording.config.default_max_latency_ms);

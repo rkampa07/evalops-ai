@@ -1,16 +1,33 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { TestCaseForm } from "../components/TestCaseForm";
-import { Badge, Card, Empty, ErrorBanner, Loading, PageHeader } from "../components/ui";
+import {
+  Badge,
+  Card,
+  Empty,
+  ErrorBanner,
+  Loading,
+  PageHeader,
+  PaginationControls,
+} from "../components/ui";
 import { useAsync } from "../lib/useAsync";
+
+const PAGE_SIZE = 50;
 
 export function DatasetDetail() {
   const id = Number(useParams().id);
   const navigate = useNavigate();
-  const { data, error, loading, reload } = useAsync(
-    () => Promise.all([api.getDataset(id), api.listTestCases(id), api.listPassages(id)]),
-    [id],
+  const [caseOffset, setCaseOffset] = useState(0);
+  const [passageOffset, setPassageOffset] = useState(0);
+  const dataset = useAsync(() => api.getDataset(id), [id]);
+  const cases = useAsync(
+    () => api.listTestCasesPage(id, { limit: PAGE_SIZE, offset: caseOffset }),
+    [id, caseOffset],
+  );
+  const passages = useAsync(
+    () => api.listPassagesPage(id, { limit: PAGE_SIZE, offset: passageOffset }),
+    [id, passageOffset],
   );
   const [showPassages, setShowPassages] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -18,15 +35,39 @@ export function DatasetDetail() {
   const [expanded, setExpanded] = useState<number>();
   const [actionError, setActionError] = useState<string>();
 
-  if (loading && !data) return <Loading />;
+  useEffect(() => {
+    setCaseOffset(0);
+    setPassageOffset(0);
+    setExpanded(undefined);
+    setEditing(undefined);
+  }, [id]);
+  useEffect(() => {
+    if (cases.data && caseOffset > 0 && caseOffset >= cases.data.total) {
+      setCaseOffset(Math.max(0, (Math.ceil(cases.data.total / PAGE_SIZE) - 1) * PAGE_SIZE));
+    }
+  }, [caseOffset, cases.data]);
+  useEffect(() => {
+    if (passages.data && passageOffset > 0 && passageOffset >= passages.data.total) {
+      setPassageOffset(Math.max(0, (Math.ceil(passages.data.total / PAGE_SIZE) - 1) * PAGE_SIZE));
+    }
+  }, [passageOffset, passages.data]);
+
+  function reload() {
+    dataset.reload();
+    cases.reload();
+    passages.reload();
+  }
+
+  const error = dataset.error ?? cases.error ?? passages.error;
+  if (dataset.loading || cases.loading || passages.loading) return <Loading />;
   if (error) return <ErrorBanner error={error} onRetry={reload} />;
-  if (!data) return null;
-  const [dataset, cases, passages] = data;
+  if (!dataset.data || !cases.data || !passages.data) return null;
+  const ds = dataset.data;
 
   async function removeDataset() {
-    if (!window.confirm(`Delete dataset "${dataset.name}" and all its test cases?`)) return;
+    if (!window.confirm(`Delete dataset "${ds.name}" and all its test cases?`)) return;
     try {
-      await api.deleteDataset(dataset.id);
+      await api.deleteDataset(ds.id);
       navigate("/datasets");
     } catch (err) {
       setActionError((err as Error).message);
@@ -46,19 +87,19 @@ export function DatasetDetail() {
   return (
     <>
       <PageHeader
-        title={dataset.name}
+        title={ds.name}
         subtitle={
           <>
-            {dataset.description || "No description"} <Badge tone="neutral">{`version ${dataset.version}`}</Badge>
+            {ds.description || "No description"} <Badge tone="neutral">{`version ${ds.version}`}</Badge>
           </>
         }
         actions={
           <>
-            <Link className="btn" to={`/runs/new?dataset=${dataset.id}`}>
+              <Link className="btn" to={`/runs/new?dataset=${ds.id}`}>
               Evaluate responses
             </Link>
-            <Link className="btn" to={`/runs?dataset=${dataset.id}`}>
-              Runs ({dataset.run_count})
+              <Link className="btn" to={`/runs?dataset=${ds.id}`}>
+                Runs ({ds.run_count})
             </Link>
             <button className="btn btn-danger" onClick={removeDataset}>
               Delete
@@ -68,9 +109,9 @@ export function DatasetDetail() {
       />
       {actionError && <ErrorBanner error={actionError} />}
 
-      {passages.length > 0 && (
+      {passages.data.total > 0 && (
         <Card
-          title={`Knowledge base (${passages.length} passages)`}
+          title={`Knowledge base (${passages.data.total} passages)`}
           actions={
             <button
               className="btn btn-small"
@@ -82,10 +123,12 @@ export function DatasetDetail() {
             </button>
           }
         >
-          {showPassages ? (
+          {passages.loading ? (
+            <Loading what="Loading passages" />
+          ) : showPassages ? (
             <table className="table compact">
               <tbody>
-                {passages.map((p) => (
+                {passages.data.items.map((p) => (
                   <tr key={p.passage_id}>
                     <td className="mono">{p.passage_id}</td>
                     <td>
@@ -96,13 +139,22 @@ export function DatasetDetail() {
               </tbody>
             </table>
           ) : (
-            <p className="muted small">Passages answers are graded against. Their ids are the citation markers, e.g. [{passages[0]?.passage_id}].</p>
+            <p className="muted small">Passages answers are graded against. Their ids are the citation markers, e.g. [{passages.data.items[0]?.passage_id}].</p>
+          )}
+          {showPassages && (
+            <PaginationControls
+              limit={passages.data.limit}
+              offset={passageOffset}
+              total={passages.data.total}
+              loading={passages.loading}
+              onOffsetChange={setPassageOffset}
+            />
           )}
         </Card>
       )}
 
       <Card
-        title={`Test cases (${cases.length})`}
+        title={`Test cases (${cases.data.total})`}
         actions={
           !adding && (
             <button className="btn btn-primary btn-small" onClick={() => setAdding(true)}>
@@ -117,14 +169,16 @@ export function DatasetDetail() {
               submitLabel="Create test case"
               onCancel={() => setAdding(false)}
               onSubmit={async (value) => {
-                await api.createTestCase(dataset.id, value);
+                await api.createTestCase(ds.id, value);
                 setAdding(false);
                 reload();
               }}
             />
           </div>
         )}
-        {cases.length === 0 ? (
+        {cases.loading ? (
+          <Loading what="Loading test cases" />
+        ) : cases.data.items.length === 0 ? (
           <Empty>No test cases yet. Add one above or import a dataset JSON.</Empty>
         ) : (
           <table className="table">
@@ -138,7 +192,7 @@ export function DatasetDetail() {
               </tr>
             </thead>
             <tbody>
-              {cases.map((c) => (
+              {cases.data.items.map((c) => (
                 <Fragment key={c.id}>
                   <tr>
                     <td className="mono">
@@ -216,6 +270,13 @@ export function DatasetDetail() {
             </tbody>
           </table>
         )}
+        <PaginationControls
+          limit={cases.data.limit}
+          offset={caseOffset}
+          total={cases.data.total}
+          loading={cases.loading}
+          onOffsetChange={setCaseOffset}
+        />
       </Card>
     </>
   );

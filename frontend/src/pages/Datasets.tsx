@@ -1,25 +1,33 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { TestCaseInput } from "../api/types";
-import { Card, Empty, ErrorBanner, Loading, PageHeader } from "../components/ui";
+import type { Dataset, TestCaseInput } from "../api/types";
+import { Card, Empty, ErrorBanner, Loading, PageHeader, PaginationControls } from "../components/ui";
 import { dateTime } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
+const PAGE_SIZE = 50;
+
 export function Datasets() {
-  const { data, error, loading, reload } = useAsync(() => api.listDatasets(), []);
+  const [offset, setOffset] = useState(0);
+  const { data, error, loading, reload } = useAsync(
+    () => api.listDatasetsPage({ limit: PAGE_SIZE, offset }),
+    [offset],
+  );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [importText, setImportText] = useState("");
   const [formError, setFormError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [createdDataset, setCreatedDataset] = useState<Dataset>();
 
   async function create(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
     setBusy(true);
     try {
-      await api.createDataset({ name, description });
+      const created = await api.createDataset({ name, description });
+      setCreatedDataset(created);
       setName("");
       setDescription("");
       reload();
@@ -54,6 +62,7 @@ export function Datasets() {
         throw err;
       }
       setImportText("");
+      setCreatedDataset(ds);
       reload();
     } catch (err) {
       setFormError(`Import failed: ${(err as Error).message}`);
@@ -70,6 +79,11 @@ export function Datasets() {
     <>
       <PageHeader title="Datasets" subtitle="Golden test sets. Each test case defines the checks a response must pass." />
       {formError && <ErrorBanner error={formError} />}
+      {createdDataset && (
+        <p role="status" className="muted">
+          Created <Link to={`/datasets/${createdDataset.id}`}>{createdDataset.name}</Link>.
+        </p>
+      )}
       <div className="grid-2">
         <Card title="New dataset">
           <form onSubmit={create} className="form">
@@ -104,12 +118,12 @@ export function Datasets() {
         </Card>
       </div>
 
-      <Card title="All datasets">
-        {loading && !data ? (
+      <Card title={`All datasets${data ? ` (${data.total})` : ""}`}>
+        {loading ? (
           <Loading />
         ) : error ? (
           <ErrorBanner error={error} onRetry={reload} />
-        ) : !data?.length ? (
+        ) : !data?.items.length ? (
           <Empty>No datasets yet.</Empty>
         ) : (
           <table className="table">
@@ -123,7 +137,7 @@ export function Datasets() {
               </tr>
             </thead>
             <tbody>
-              {data.map((d) => (
+              {data.items.map((d) => (
                 <tr key={d.id}>
                   <td>
                     <Link to={`/datasets/${d.id}`}>{d.name}</Link>
@@ -136,6 +150,15 @@ export function Datasets() {
               ))}
             </tbody>
           </table>
+        )}
+        {data && (
+          <PaginationControls
+            limit={data.limit}
+            offset={offset}
+            total={data.total}
+            loading={loading}
+            onOffsetChange={setOffset}
+          />
         )}
       </Card>
     </>

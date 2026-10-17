@@ -150,7 +150,9 @@ export function mockFetch(routes: Record<string, unknown>) {
     const url = new URL(String(input));
     const key = `${init?.method ?? "GET"} ${url.pathname}`;
     calls.push(`${key}${url.search}`);
-    const body = routes[key];
+    const body = key === "GET /auth/session"
+      ? routes[key] ?? { authenticated: true, mode: "development", user: null, csrf_token: null }
+      : routes[key];
     if (body === undefined) {
       return new Response(JSON.stringify({ error: { code: "not_found", message: `no mock for ${key}` } }), { status: 404 });
     }

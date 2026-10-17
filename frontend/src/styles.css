@@ -163,3 +163,30 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
   .content { padding: 16px; }
   .grid-2, .grid-3, .filters { grid-template-columns: 1fr; }
 }
+
+/* Live playground */
+.status-banner { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
+.status-off { border-color: var(--warn); }
+.playground { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px; align-items: start; }
+.session-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.session-list .active { font-weight: 700; }
+.messages { display: flex; flex-direction: column; gap: 10px; max-height: 62vh; overflow-y: auto; padding: 4px; }
+.bubble { max-width: 90%; border-radius: 12px; padding: 10px 12px; }
+.bubble-user { align-self: flex-end; background: var(--info-bg); }
+.bubble-assistant { align-self: flex-start; background: var(--surface-2); width: 90%; }
+.bubble-text { white-space: pre-wrap; }
+.bubble-meta { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.composer { display: flex; gap: 8px; margin-top: 12px; align-items: flex-end; }
+.composer textarea { flex: 1; }
+.inspector { margin-top: 10px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.inspector-section h3 { font-size: 13px; margin: 0 0 6px; }
+.prompt-message { margin-top: 6px; }
+.lexical-label { font-size: 12.5px; background: var(--warn-bg); color: var(--warn); padding: 6px 8px; border-radius: 6px; margin: 0 0 6px; }
+.warn-text { color: var(--warn); }
+fieldset { border: 1px solid var(--border); border-radius: 7px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 860px) { .playground { grid-template-columns: 1fr; } .bubble-assistant { width: 100%; } }
+
+.diagnostics { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.diagnostic { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+.diagnostic blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--border); }
+.raw-output { white-space: pre-wrap; }

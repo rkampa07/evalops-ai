@@ -13,7 +13,37 @@ function renderAt(path: string) {
   );
 }
 
+function runDetailPageMocks(id: number) {
+  const { results, ...summary } = ragRun(id);
+  return {
+    [`GET /evaluations/runs/${id}/summary`]: summary,
+    [`GET /evaluations/runs/${id}/results`]: {
+      items: results,
+      total: results.length,
+      limit: 50,
+      offset: 0,
+    },
+  };
+}
+
 describe("Overview", () => {
+  it("shows the OIDC sign-in screen when no authenticated session exists", async () => {
+    mockFetch({
+      "GET /auth/session": {
+        authenticated: false,
+        mode: "oidc",
+        user: null,
+        csrf_token: null,
+      },
+    });
+    renderAt("/");
+    expect(await screen.findByRole("heading", { name: "Sign in to EvalOps AI" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "http://127.0.0.1:8000/auth/login",
+    );
+  });
+
   it("shows stats computed from API data", async () => {
     mockFetch({
       "GET /datasets": [dataset],
@@ -36,6 +66,37 @@ describe("Overview", () => {
     mockFetch({ "GET /datasets": [], "GET /evaluations/runs": { items: [], total: 0, limit: 20, offset: 0 } });
     renderAt("/");
     expect(await screen.findByText(/No evaluation runs yet/)).toBeInTheDocument();
+  });
+
+  it("switches workspace from the selector and scopes subsequent API requests", async () => {
+    const auth = {
+      authenticated: true,
+      mode: "oidc" as const,
+      user: { id: 1, issuer: "issuer", subject: "subject" },
+      csrf_token: "csrf",
+      workspaces: [
+        { id: 2, name: "Alpha", role: "owner" as const, is_legacy: false },
+        { id: 3, name: "Beta", role: "editor" as const, is_legacy: false },
+      ],
+      active_workspace_id: 2,
+    };
+    const fetchMock = mockFetch({
+      "GET /auth/session": auth,
+      "PUT /auth/session/workspace": { ...auth, active_workspace_id: 3 },
+      "GET /datasets": [],
+      "GET /evaluations/runs": { items: [], total: 0, limit: 20, offset: 0 },
+    });
+    renderAt("/");
+    const selector = await screen.findByRole("combobox", { name: "Workspace" });
+    await userEvent.selectOptions(selector, "3");
+    await waitFor(() => {
+      const scoped = fetchMock.fn.mock.calls.some(([input, init]) => {
+        const url = new URL(String(input));
+        return url.pathname === "/datasets" && new Headers(init?.headers).get("X-Workspace-ID") === "3";
+      });
+      expect(scoped).toBe(true);
+    });
+    expect(screen.getByRole("combobox", { name: "Workspace" })).toHaveValue("3");
   });
 });
 
@@ -94,7 +155,7 @@ describe("Compare compatibility", () => {
 
 describe("RAG run detail", () => {
   it("separates deterministic evidence from estimated model scores", async () => {
-    mockFetch({ "GET /evaluations/runs/7": ragRun(7) });
+    mockFetch(runDetailPageMocks(7));
     renderAt("/runs/7");
     expect(await screen.findByText("RAG evidence")).toBeInTheDocument();
     expect(screen.getByText("deterministic")).toBeInTheDocument();
@@ -105,7 +166,7 @@ describe("RAG run detail", () => {
   });
 
   it("shows heuristic and judge verdicts per claim", async () => {
-    mockFetch({ "GET /evaluations/runs/7": ragRun(7) });
+    mockFetch(runDetailPageMocks(7));
     renderAt("/runs/7");
     await userEvent.click(await screen.findByRole("button", { name: "q-ship-uk" }));
     const row = screen.getByText("Yes, you can ship your order to London in the UK.").closest("tr")!;
@@ -176,8 +237,54 @@ describe("NewRun", () => {
   it("prefills fields from an uploaded response file and submits", async () => {
     const { fn } = mockFetch({
       "GET /datasets": [dataset],
-      "POST /evaluations/runs": { ...run(9), results: [] },
-      "GET /evaluations/runs/9": { ...run(9), results: [] },
+      "POST /evaluations/jobs": {
+        job_id: 9,
+        status: "queued",
+        status_url: "/evaluations/jobs/9",
+        dataset_id: 1,
+        dataset_version: 2,
+        scoring_input_fingerprint: "f".repeat(64),
+        knowledge_base_hash: null,
+        progress: { completed: 0, total: 1, fraction: 0 },
+        created_at: "2026-10-16T10:00:00Z",
+        updated_at: "2026-10-16T10:00:00Z",
+        started_at: null,
+        heartbeat_at: null,
+        finished_at: null,
+        attempt_count: 0,
+        lease_owner: null,
+        lease_expires_at: null,
+        cancellation_requested_at: null,
+        error: null,
+        run_id: null,
+        retry_of_job_id: null,
+        replayed: false,
+      },
+      "GET /evaluations/jobs/9": {
+        job_id: 9,
+        status: "succeeded",
+        status_url: "/evaluations/jobs/9",
+        dataset_id: 1,
+        dataset_version: 2,
+        scoring_input_fingerprint: "f".repeat(64),
+        knowledge_base_hash: null,
+        progress: { completed: 1, total: 1, fraction: 1 },
+        created_at: "2026-10-16T10:00:00Z",
+        updated_at: "2026-10-16T10:00:00Z",
+        started_at: "2026-10-16T10:00:00Z",
+        heartbeat_at: "2026-10-16T10:00:00Z",
+        finished_at: "2026-10-16T10:00:00Z",
+        attempt_count: 1,
+        lease_owner: null,
+        lease_expires_at: null,
+        cancellation_requested_at: null,
+        error: null,
+        run_id: 9,
+        retry_of_job_id: null,
+        replayed: false,
+      },
+      "GET /evaluations/runs/9/summary": run(9),
+      "GET /evaluations/runs/9/results": { items: [], total: 0, limit: 50, offset: 0 },
     });
     renderAt("/runs/new?dataset=1");
     const textarea = await screen.findByLabelText("Responses JSON");
@@ -186,7 +293,7 @@ describe("NewRun", () => {
     await userEvent.click(textarea);
     await userEvent.paste(body);
     expect(screen.getByLabelText("Model name")).toHaveValue("m-x");
-    await userEvent.click(screen.getByRole("button", { name: "Run evaluation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Queue evaluation" }));
     expect(await screen.findByText("Run #9")).toBeInTheDocument();
     const post = fn.mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === "POST");
     const sent = JSON.parse(String((post![1] as RequestInit).body));

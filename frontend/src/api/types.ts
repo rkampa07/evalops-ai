@@ -12,6 +12,29 @@ export interface Dataset {
   passage_count: number;
 }
 
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AuthSession {
+  authenticated: boolean;
+  mode: "oidc" | "development";
+  user?: { id: number; issuer: string; subject: string } | null;
+  csrf_token?: string | null;
+  workspaces?: WorkspaceSummary[];
+  active_workspace_id?: number | null;
+}
+
+export interface WorkspaceSummary {
+  id: number;
+  name: string;
+  role: "owner" | "admin" | "editor" | "viewer";
+  is_legacy: boolean;
+}
+
 export interface Passage {
   passage_id: string;
   title: string;
@@ -216,6 +239,187 @@ export interface RunCreate {
   responses: ResponseInput[];
 }
 
+export type EvaluationJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface JobProgress {
+  completed: number;
+  total: number;
+  fraction: number | null;
+}
+
+export interface JobError {
+  code: string;
+  message: string;
+}
+
+export interface EvaluationJob {
+  job_id: number;
+  status: EvaluationJobStatus;
+  status_url: string;
+  dataset_id: number;
+  dataset_version: number;
+  scoring_input_fingerprint: string;
+  knowledge_base_hash: string | null;
+  progress: JobProgress;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  heartbeat_at: string | null;
+  finished_at: string | null;
+  attempt_count: number;
+  lease_owner: string | null;
+  lease_expires_at: string | null;
+  cancellation_requested_at: string | null;
+  error: JobError | null;
+  run_id: number | null;
+  retry_of_job_id: number | null;
+  replayed: boolean;
+}
+
+export type AssessmentStatus = EvaluationJobStatus;
+export type CitationAssessmentStatus = AssessmentStatus;
+
+export type CitationPredictionStatus =
+  | "correct"
+  | "wrong_passage"
+  | "unrelated"
+  | "not_retrieved"
+  | "partial"
+  | "not_applicable"
+  | "missing_citation"
+  | "invalid_citation"
+  | "unresolved";
+
+export interface CitationAssessmentCreate {
+  evaluator: "citation";
+  citation_expected: boolean;
+}
+
+export interface ClaimAssessmentCreate {
+  evaluator: "claim";
+}
+
+export type AssessmentCreate = CitationAssessmentCreate | ClaimAssessmentCreate;
+
+export interface CitationAssessmentJob {
+  assessment_id: number;
+  evaluator: "citation";
+  status: CitationAssessmentStatus;
+  status_url: string;
+  result_url: string;
+  run_id: number;
+  result_id: number;
+  progress: JobProgress;
+  evaluator_version: string;
+  predictor_sha256: string;
+  runner_sha256: string;
+  config_digest: string;
+  input_fingerprint: string;
+  knowledge_base_hash: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  heartbeat_at: string | null;
+  finished_at: string | null;
+  attempt_count: number;
+  cancellation_requested: boolean;
+  error: JobError | null;
+  replayed: boolean;
+}
+
+export interface CitationDecision {
+  citation_id: string | null;
+  status: CitationPredictionStatus;
+  reason_code: string;
+  reason: string;
+  component_coverage: number[];
+}
+
+export interface CitationAssessmentResult {
+  assessment_id: number;
+  run_id: number;
+  result_id: number;
+  case_key: string;
+  evaluator_version: string;
+  predictor_sha256: string;
+  runner_sha256: string;
+  config_digest: string;
+  input_fingerprint: string;
+  knowledge_base_hash: string | null;
+  status: CitationPredictionStatus;
+  reason_code: string;
+  reason: string;
+  per_citation: CitationDecision[];
+  created_at: string;
+}
+
+export interface ClaimAssessmentJob {
+  assessment_id: number;
+  evaluator: "claim";
+  status: CitationAssessmentStatus;
+  status_url: string;
+  result_url: string;
+  run_id: number;
+  result_id: number;
+  progress: JobProgress;
+  evaluator_version: string;
+  source_sha256: string;
+  config_digest: string;
+  model_id: string;
+  model_revision: string;
+  input_fingerprint: string;
+  knowledge_base_hash: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  heartbeat_at: string | null;
+  finished_at: string | null;
+  attempt_count: number;
+  cancellation_requested: boolean;
+  error: JobError | null;
+  replayed: boolean;
+}
+
+export type ClaimLabel =
+  | "supported"
+  | "contradicted"
+  | "insufficient_evidence"
+  | "needs_human_review";
+
+export interface ClaimVerdict {
+  claim_text: string;
+  label: ClaimLabel;
+  abstained: boolean;
+  reason: string;
+  diagnostic_branch: string;
+  deciding_evidence: Record<string, unknown>[];
+  guards: string[];
+  config: Record<string, unknown>;
+  model: Record<string, unknown>;
+  uncalibrated_scores: Record<string, unknown>[];
+  ignored_contradictions: Record<string, unknown>[];
+}
+
+export interface ClaimAssessmentResult {
+  assessment_id: number;
+  run_id: number;
+  result_id: number;
+  case_key: string;
+  evaluator_version: string;
+  source_sha256: string;
+  config_digest: string;
+  model_id: string;
+  model_revision: string;
+  input_fingerprint: string;
+  knowledge_base_hash: string | null;
+  status: string;
+  claims: ClaimVerdict[];
+  created_at: string;
+}
+
+export type AssessmentJob = CitationAssessmentJob | ClaimAssessmentJob;
+export type AssessmentResult = CitationAssessmentResult | ClaimAssessmentResult;
+
 export interface RunRef {
   id: number;
   model_name: string;
@@ -336,4 +540,128 @@ export interface Report {
   failing_cases: Result[];
   notes: string[];
   markdown: string;
+}
+
+// ---------------------------------------------------------------- live chat playground
+
+export interface ChatStatus {
+  enabled: boolean;
+  backend: "off" | "fixture" | "mlx";
+  model_id: string | null;
+  model_revision: string | null;
+  loaded: boolean;
+  busy: boolean;
+  prompt_versions: string[];
+  max_message_chars: number;
+  history_exchanges: number;
+  scope: string;
+}
+
+export interface ChatSession {
+  id: number;
+  dataset_id: number;
+  dataset_name: string | null;
+  title: string;
+  prompt_version: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface TracePassage {
+  passage_id: string;
+  title: string;
+  text: string;
+  bm25_score: number;
+}
+
+export interface LiveCheck {
+  label: string;
+  methodology_version: string;
+  passed_lexical_checks: boolean;
+  failures: Failure[];
+  abstained: boolean;
+  abstention: string;
+  citations: string[];
+  citations_valid: number;
+  citations_nonexistent: string[];
+  citations_not_retrieved: string[];
+  citation_pairs_total: number;
+  citation_pairs_supporting: number;
+  claims: ClaimCheck[];
+  groundedness: number | null;
+  unsupported_claims: string[];
+  min_groundedness: number;
+}
+
+export type DiagnosticState = "potential_contradiction" | "citation_concern" | "needs_human_review";
+
+export interface ChatDiagnosticWarning {
+  state: DiagnosticState;
+  kind: string;
+  claim: string;
+  evidence: { passage_id: string; text: string } | null;
+  reason: string;
+  heuristic: true;
+}
+
+export interface ChatDiagnostics {
+  version: string;
+  label: string;
+  warnings: ChatDiagnosticWarning[];
+  claims_checked: number;
+  note?: string;
+  computed_on_read?: boolean;
+}
+
+export interface ChatTrace {
+  retrieval: {
+    query: string;
+    used_previous_turn: boolean;
+    retriever: string;
+    k: number;
+    passages: TracePassage[];
+  };
+  prompt: {
+    template_version: string;
+    chat_prompt_version: string;
+    hash: string;
+    history_exchanges_included: number;
+    history_truncated: boolean;
+    messages: { role: string; content: string }[];
+  };
+  model: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  generation: Record<string, unknown>;
+  live_check: LiveCheck;
+  /** Chat-only heuristic warnings; absent only on very old traces. */
+  diagnostics?: ChatDiagnostics;
+  judge: { status: string };
+}
+
+export interface ChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  trace: ChatTrace | null;
+  saved_test_case_id: number | null;
+  created_at: string;
+}
+
+export interface ChatSessionDetail extends ChatSession {
+  messages: ChatMessage[];
+}
+
+export interface ChatTurn {
+  session: ChatSession;
+  user_message: ChatMessage;
+  assistant_message: ChatMessage;
+}
+
+export interface SaveChatTestCaseInput {
+  key: string;
+  input?: string;
+  relevant_passage_ids: string[];
+  expect_abstain: boolean;
+  required_terms?: string[];
 }
