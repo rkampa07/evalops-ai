@@ -1479,6 +1479,39 @@ def make_cache(root, revision=SHA, files=FULL_SNAPSHOT, main=None):
     return snap
 
 
+@pytest.fixture(autouse=True)
+def _stub_huggingface_hub_when_absent(monkeypatch):
+    """Provide offline cache lookup when optional huggingface_hub is not installed."""
+    import importlib.util
+    import os
+
+    if importlib.util.find_spec("huggingface_hub") is not None:
+        return
+
+    def _try_to_load_from_cache(repo_id, filename, cache_dir=None, revision=None, repo_type=None):
+        if not cache_dir:
+            return None
+        rev = revision or "main"
+        repo_cache = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}")
+        if not os.path.isdir(repo_cache):
+            return None
+        ref_file = os.path.join(repo_cache, "refs", rev)
+        if os.path.isfile(ref_file):
+            with open(ref_file) as handle:
+                rev = handle.read().strip()
+        snapshots_dir = os.path.join(repo_cache, "snapshots")
+        if not os.path.isdir(snapshots_dir) or rev not in os.listdir(snapshots_dir):
+            return None
+        cached_file = os.path.join(snapshots_dir, rev, filename)
+        return cached_file if os.path.isfile(cached_file) else None
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        types.SimpleNamespace(try_to_load_from_cache=_try_to_load_from_cache),
+    )
+
+
 def test_f4_snapshot_files_are_verified_and_recorded(tmp_path):
     snap = make_cache(tmp_path)
     record = verify_cached_snapshot(REPO, SHA, cache_dir=tmp_path)

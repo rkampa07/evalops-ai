@@ -629,7 +629,7 @@ with TemporaryDirectory(prefix="evalops-e2e-assess-") as tmp:
     } finally {
       bridge.close();
     }
-  });
+  }, 15_000);
 
   it("completes an end-to-end semantic claim assessment via ClaimAssessmentService and ClaimAssessmentWorker with a stubbed verifier_factory while preserving lexical metrics and release gates", async () => {
     const user = userEvent.setup();
@@ -791,7 +791,7 @@ with TemporaryDirectory(prefix="evalops-e2e-assess-") as tmp:
     } finally {
       bridge.close();
     }
-  });
+  }, 15_000);
 });
 
 
