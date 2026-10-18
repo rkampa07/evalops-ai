@@ -22,6 +22,12 @@ packages, tokenizer files, or model weights fail the job with sanitized `model_u
 is no lexical fallback. On an 8 GB machine, run one claim worker so only one NLI model instance is
 resident.
 
+For the isolated demo, `make assessment-demo-worker-real` selects the same verifier with CPU tensors
+and two threads. `make assessment-demo-worker` explicitly keeps the simulated lightweight mode.
+Optional local NLI setup, pinned download, smoke testing, and execution-provenance UI are documented
+in the [real demo guide](assessment-demo.md#real-deberta-mode-phase-5h). The API and frozen evaluator
+contracts are unchanged.
+
 Start the citation worker separately if citation jobs are also needed:
 
 ```sh

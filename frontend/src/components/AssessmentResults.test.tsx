@@ -147,9 +147,10 @@ describe("AssessmentResults components", () => {
       within(rows[2]!).getByText(/guards: exception_guard, numeric_guard/),
     ).toBeInTheDocument();
 
-    // Non-simulated results show standard "Model" label and omit simulated verifier disclosure
-    expect(screen.getByText("Model")).toBeInTheDocument();
-    expect(screen.queryByText("Configured model")).not.toBeInTheDocument();
+    // Configured model alone never proves that inference was executed.
+    expect(screen.getByText("Configured model")).toBeInTheDocument();
+    expect(screen.getByTestId("executed-model")).toHaveTextContent("Not recorded");
+    expect(screen.queryByText("Real NLI inference")).not.toBeInTheDocument();
     expect(
       screen.queryByText("Simulated verifier — no NLI model loaded"),
     ).not.toBeInTheDocument();
@@ -222,9 +223,40 @@ describe("AssessmentResults components", () => {
     expect(
       screen.queryByText("Simulated verifier — no NLI model loaded"),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Model")).toBeInTheDocument();
-    expect(screen.queryByText("Configured model")).not.toBeInTheDocument();
+    expect(screen.getByText("Configured model")).toBeInTheDocument();
+    expect(screen.getByTestId("inference-backend")).toHaveTextContent("transformers");
+    expect(screen.queryByText("Real NLI inference")).not.toBeInTheDocument();
     expect(screen.queryByTestId("executed-verifier")).not.toBeInTheDocument();
+  });
+
+  it("identifies real inference only with matching executed model, verified snapshot, and scored pairs", () => {
+    const real: ClaimAssessmentResult = {
+      ...claimFixture,
+      claims: [{
+        ...claimFixture.claims[0]!,
+        model: {
+          backend: "transformers", model_id: claimFixture.model_id,
+          revision: claimFixture.model_revision, resolved_snapshot_commit: claimFixture.model_revision,
+          snapshot_files: { "model.safetensors": { bytes: 567605820 } },
+        },
+        uncalibrated_scores: [{ entailment: 0.994845, contradiction: 0.000091, neutral: 0.005064 }],
+      }],
+    };
+    const { rerender } = render(<ClaimAssessmentResultCard result={real} />);
+    expect(screen.getByText("Real NLI inference")).toBeInTheDocument();
+    expect(screen.getByTestId("executed-model")).toHaveTextContent(real.model_id);
+    expect(screen.getByTestId("model-revision")).toHaveTextContent(real.model_revision);
+    expect(screen.getByTestId("inference-backend")).toHaveTextContent("transformers");
+    expect(screen.queryByTestId("executed-verifier")).not.toBeInTheDocument();
+    for (const changes of [
+      { uncalibrated_scores: [] },
+      { model: { ...real.claims[0]!.model, resolved_snapshot_commit: "0".repeat(40) } },
+      { model: { ...real.claims[0]!.model, model_id: "different-model" } },
+      { uncalibrated_scores: [{ entailment: 9, contradiction: -8, neutral: 0 }] },
+    ]) {
+      rerender(<ClaimAssessmentResultCard result={{ ...real, claims: [{ ...real.claims[0]!, ...changes }] }} />);
+      expect(screen.queryByText("Real NLI inference")).not.toBeInTheDocument();
+    }
   });
 
   it("handles empty citation and claim results and null knowledge_base_hash gracefully", () => {

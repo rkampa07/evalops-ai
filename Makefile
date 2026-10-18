@@ -5,7 +5,8 @@ API_URL ?= http://127.0.0.1:8000
 
 .PHONY: setup setup-local-ai backend chat chat-fixture frontend seed migrate test test-backend test-frontend lint check clean-db \
 	rag-demo rag-demo-live rag-generate rag-calibrate labels-export labels-import lock e2e e2e-install \
-	assessment-demo-backend assessment-demo-seed assessment-demo-worker clean-assessment-demo-db
+	assessment-demo-backend assessment-demo-seed assessment-demo-worker assessment-demo-worker-real \
+	setup-nli assessment-nli-download assessment-nli-check assessment-nli-smoke clean-assessment-demo-db
 
 GEN_MODEL   ?= mlx-community/Qwen2.5-1.5B-Instruct-4bit
 JUDGE_MODEL ?= mlx-community/Llama-3.2-3B-Instruct-4bit
@@ -114,7 +115,22 @@ assessment-demo-seed:    ## Seed RAG dataset and recorded runs into the running 
 	$(PY) backend/scripts/rag_demo.py --base-url $(API_URL)
 
 assessment-demo-worker:  ## Run frozen citation worker + simulated claim worker on isolated assessment_demo.db
-	EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" $(PY) backend/scripts/assessment_demo_worker.py
+	EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" $(PY) backend/scripts/assessment_demo_worker.py --verifier simulated
+
+setup-nli: ## Optional pinned CPU NLI packages only (macOS arm64, Python 3.13; no MLX)
+	$(PIP) install --require-hashes -r requirements/nli.lock
+
+assessment-nli-download: ## Explicitly fetch only the exact pinned model/config/tokenizer files
+	$(PY) backend/scripts/assessment_nli.py download
+
+assessment-nli-check: ## Verify local NLI dependencies/snapshot without model loading
+	$(PY) backend/scripts/assessment_nli.py check
+
+assessment-nli-smoke: ## Run actual CPU entailment/contradiction/neutral inference, offline
+	HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false $(PY) backend/scripts/assessment_nli.py smoke
+
+assessment-demo-worker-real: ## Run the real pinned CPU claim verifier on isolated assessment_demo.db
+	EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false $(PY) backend/scripts/assessment_demo_worker.py --verifier real
 
 clean-assessment-demo-db: ## Safely remove only backend/data/assessment_demo.db and sidecars when idle
 	EVALOPS_DATABASE_URL="$(ASSESS_DEMO_DB_URL)" $(PY) backend/scripts/assessment_demo_worker.py --clean-db

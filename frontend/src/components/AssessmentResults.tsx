@@ -267,6 +267,25 @@ function detectSimulatedClaimVerifier(claims: ClaimVerdict[]): SimulatedVerifier
   return null;
 }
 
+function hasRecordedNliInference(verdict: ClaimVerdict, result: ClaimAssessmentResult): boolean {
+  const model = verdict.model;
+  const files = model?.snapshot_files;
+  const hasSnapshot = Boolean(files && typeof files === "object" && Object.keys(files).length > 0);
+  return Boolean(
+    model?.backend === "transformers" &&
+    model.model_id === result.model_id &&
+    /^[a-f0-9]{40}$/.test(result.model_revision) &&
+    model.revision === result.model_revision &&
+    model.resolved_snapshot_commit === result.model_revision &&
+    hasSnapshot &&
+    verdict.uncalibrated_scores?.some((scores) => {
+      const values = [scores.entailment, scores.contradiction, scores.neutral];
+      return values.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1) &&
+        Math.abs((values as number[]).reduce((sum, v) => sum + v, 0) - 1) < 0.001;
+    })
+  );
+}
+
 /** Read-only presentation for a completed frozen semantic claim assessment. */
 export function ClaimAssessmentResultCard({ result }: { result: ClaimAssessmentResult }) {
   const claims = Array.isArray(result.claims) ? result.claims : [];
@@ -276,6 +295,10 @@ export function ClaimAssessmentResultCard({ result }: { result: ClaimAssessmentR
   const inputHash = shortHash(result.input_fingerprint);
   const kbHash = shortHash(result.knowledge_base_hash);
   const simulatedInfo = detectSimulatedClaimVerifier(claims);
+  const realInference = !simulatedInfo && claims.length > 0 &&
+    claims.every((claim) => hasRecordedNliInference(claim, result));
+  const backends = [...new Set(claims.map((claim) => claim.model?.backend)
+    .filter((backend): backend is string => typeof backend === "string" && backend.length > 0))];
 
   return (
     <Card
@@ -285,6 +308,7 @@ export function ClaimAssessmentResultCard({ result }: { result: ClaimAssessmentR
           {simulatedInfo && (
             <Badge tone="neutral">Simulated verifier — no NLI model loaded</Badge>
           )}
+          {realInference && <Badge tone="info">Real NLI inference</Badge>}
         </>
       }
       actions={<Badge tone={claimStatusTone(status)}>{status}</Badge>}
@@ -297,11 +321,20 @@ export function ClaimAssessmentResultCard({ result }: { result: ClaimAssessmentR
         <dd className="mono">
           #{result.assessment_id} · case {result.case_key}
         </dd>
-        <dt>{simulatedInfo ? "Configured model" : "Model"}</dt>
+        <dt>Configured model</dt>
         <dd className="mono">
           {result.model_id || "unknown"}
           {revision && ` (${revision})`}
         </dd>
+        <dt>Model revision</dt>
+        <dd className="mono" data-testid="model-revision">{result.model_revision || "unknown"}</dd>
+        <dt>Executed model</dt>
+        <dd className="mono" data-testid="executed-model">
+          {realInference ? `${result.model_id} (${result.model_revision})` :
+            simulatedInfo ? "Simulated verifier; no NLI model executed" : "Not recorded (no verified inference provenance)"}
+        </dd>
+        <dt>Actual inference backend</dt>
+        <dd className="mono" data-testid="inference-backend">{backends.join(", ") || "Not recorded"}</dd>
         {simulatedInfo && (
           <>
             <dt>Executed verifier</dt>

@@ -90,6 +90,10 @@ separate worker processes coordinated via SQLite leases. Details:
      commit `fa2804872c3b4bd748f38c0185cc85775361e735` (loaded strictly from a verified local
      Hugging Face cache when `torch` and `transformers` are installed; fails closed with
      `model_unavailable` otherwise).
+   - **Real demo (`make assessment-demo-worker-real`):** Runs that same production verifier on CPU
+     with two threads. Optional packages and the exact snapshot must be available locally; missing
+     dependencies or weights stop real mode, with no simulated fallback. The UI identifies executed
+     inference using stored backend, snapshot, model/revision, and scored-pair provenance.
    - **Simulated demo verifier (`make assessment-demo-worker`):** For model-free local demos, the
      demo launcher injects `SimulatedDemoClaimVerifier`—a deterministic lexical-overlap stub that
      **never loads or runs the DeBERTa NLI model**. The UI explicitly labels these results with a
@@ -216,7 +220,24 @@ make frontend                  # terminal 3: UI on :5173
 make clean-assessment-demo-db  # removes only backend/data/assessment_demo.db and sidecars
 ```
 
-Full walkthrough: [Assessment demo guide](docs/assessment-demo.md).
+To run actual pinned DeBERTa instead of the simulated worker, stop that worker and use:
+
+```bash
+make setup-nli                   # optional CPU NLI lock; macOS arm64 / Python 3.13, no MLX
+make assessment-nli-download     # explicit pinned tokenizer/config/safetensors download; cache reused
+make assessment-nli-check        # verify packages and local snapshot without loading a model
+make assessment-nli-smoke        # real entailment/contradiction/neutral smoke, CPU and offline
+make assessment-demo-worker-real # same isolated demo DB; new claim assessments use real NLI
+```
+
+The real worker is the default when invoking `assessment_demo_worker.py` directly; select
+`--verifier simulated` for the stub. The existing `make assessment-demo-worker` command explicitly
+keeps its simulated behavior. Run one worker mode at a time. Existing results remain immutable;
+submit a new assessment after changing modes. Model scores are uncalibrated experimental evidence,
+not verified correctness or release-gating metrics.
+
+Full walkthrough, memory limits, provenance and measured smoke results:
+[Assessment demo guide](docs/assessment-demo.md#real-deberta-mode-phase-5h).
 
 Optional, Apple Silicon only, to regenerate answers with local models (~400 MB of packages plus
 2.7 GB of model downloads that you start yourself):

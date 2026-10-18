@@ -40,6 +40,118 @@ EvalOps AI separates release-gating metrics from opt-in per-result diagnostic as
 
 ---
 
+## Real DeBERTa mode (Phase 5H)
+
+The existing API, SQLite schema (`0014`), and lease-fenced `ClaimAssessmentWorker` also support real
+NLI. The launcher uses `make_local_verifier()` via a CPU runtime factory; it does not implement a
+second evaluator or change frozen `semantic-aggregate-v12`, its configuration digest
+(`92aacfdf47908332`), citation v4, lexical scores, comparisons, or release gates.
+
+### Optional packages and exact model snapshot
+
+On macOS arm64 with Python 3.13 and an existing `backend/.venv`:
+
+```bash
+make setup-nli
+make assessment-nli-download
+make assessment-nli-check
+make assessment-nli-smoke
+```
+
+`requirements/nli.lock` includes only the transitive CPU NLI dependencies (PyTorch, Transformers,
+Hugging Face Hub, SentencePiece and their dependencies), reusing the existing reviewed lock pins
+and hashes. It does not install MLX, sentence-transformers, CUDA or ONNX. This lock's PyTorch wheel
+hash is specific to macOS arm64 / CPython 3.13; do not use it as a Linux CI dependency lock.
+No installation or new download is necessary when these packages and the pinned cache already exist.
+
+Model downloads occur only through `assessment-nli-download`; package installation may also use
+the network. Inference never fetches weights. The download helper uses official `snapshot_download` with
+`revision=fa2804872c3b4bd748f38c0185cc85775361e735`, one download thread, and an explicit allowlist:
+`config.json`, `model.safetensors`, `tokenizer.json`, `tokenizer_config.json`,
+`special_tokens_map.json`, `added_tokens.json`, `spm.model`. It downloads no alternate checkpoint,
+pickle weights, ONNX files or unpinned revision, and leaves other caches intact. The safetensors
+checkpoint is about 568 MB (decimal); tokenizer files add about 11 MB. Its content SHA-256 was
+verified against the pinned Hub metadata as
+`ebc79588dd73ccfb6a3f6078519cfbf512c5305384c5ea1845bc71cd32216e86`. The cache
+uses the distinct Xet blob identity
+`3a9c57043e195d65bc3a07e5280c6aec6a448892a603fd02ecdbfd9ce3cdb3e4`; this is not
+the complete file's SHA-256.
+See the [pinned model files](https://huggingface.co/cross-encoder/nli-deberta-v3-small/tree/fa2804872c3b4bd748f38c0185cc85775361e735)
+and [official download API](https://huggingface.co/docs/huggingface_hub/guides/download).
+
+Regular inference uses the frozen local-cache verifier and `local_files_only=True`. Required files
+must resolve under the exact commit's snapshot; output records include the resolved commit, file
+sizes, blob identities and small-file SHA-256 values. Missing dependencies, missing files or a load
+failure produce an error, never a simulated result. Preflight does not load weights or run inference.
+
+### Start real inference
+
+Use the same isolated demo backend and seeding commands shown below. Stop any simulated worker
+before switching modes, then start:
+
+```bash
+make assessment-demo-worker-real
+```
+
+This defaults to `backend/data/assessment_demo.db`, with the existing guard rejecting the live
+`backend/data/evalops.db`. For a separate temporary database, pass an explicit URL:
+
+```bash
+EVALOPS_DATABASE_URL=sqlite:////tmp/my-isolated-assessment.db \
+  HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+  backend/.venv/bin/python backend/scripts/assessment_demo_worker.py --verifier real
+```
+
+The API must use that same isolated database. The direct script defaults to `real`; the original
+`make assessment-demo-worker` command keeps explicitly simulated behavior. Both modes can also be
+selected with `--verifier real|simulated`. `--once` processes at most one citation and one claim job;
+a failed claim returns a nonzero exit status. The looping demo worker stops on a failed claim.
+Real mode performs dependency/cache preflight before database creation or migration. Actual model
+loading remains lazy, after a durable job is acquired. Authentication, CSRF, workspace ownership,
+idempotency, cancellation, retries and result immutability continue through the existing API/worker.
+
+Run one real worker on an 8 GB machine. The runtime fixes tensors to CPU and uses two intra-op
+threads; it retains the production evaluator's batch size (16), token limit (512), and thresholds.
+MPS is not enabled. Other applications and long evidence inputs affect latency and available RAM.
+Cancellation waits for an in-flight NLI call to finish; it cannot interrupt a tensor operation.
+
+### Identify real execution and preserve history
+
+Submit a **new** claim assessment after starting the real worker. Old simulated results keep their
+original provenance and are never relabelled. The claim card shows Configured model, full Model
+revision, Executed model and Actual inference backend. It shows **Real NLI inference** only when
+all claims record Transformers, the matching model/revision, the resolved pinned snapshot and
+finite three-way probabilities for scored evidence. Configuration alone, empty evidence, or
+missing/mismatched provenance does not earn that badge. Simulated results retain their explicit
+**Simulated verifier — no NLI model loaded** disclosure and show no executed NLI model.
+
+The three-way model output (entailment, contradiction, neutral) feeds the unchanged v12 aggregation
+and guards, which may return supported, contradicted, insufficient evidence or needs-human-review.
+These probabilities are uncalibrated, and explanations/guards do not prove semantic correctness.
+Small smoke examples do not establish accuracy on policy questions. Review model errors and
+abstentions; frozen assessments remain diagnostic and do not change release decisions.
+
+### Measured local verification (2026-10-17)
+
+An M2 MacBook with 8 GB memory loaded the already-cached exact revision using CPU, PyTorch 2.14.1,
+Transformers 5.19.0 and two threads. One process loaded weights in 2.88 s; its first scored pair
+took 1.04 s, and the next two took 22–24 ms. Peak process RSS was 669 MiB (not total system memory
+or a guarantee for larger batches). These are one-run smoke measurements, not a benchmark.
+
+Evidence was "A woman is reading a book." in each case:
+
+| Claim | Expected / predicted NLI label | Probability of predicted label |
+|---|---|---|
+| A person is reading. | entailment / entailment | 0.994845 |
+| No one is reading. | contradiction / contradiction | 0.999765 |
+| The woman has two children. | neutral / neutral | 0.998641 |
+
+Model label IDs were 0=contradiction, 1=entailment, 2=neutral. A separate Chromium check submitted
+a legitimate claim through React and the API to a separate real worker and temporary SQLite DB.
+It persisted a supported verdict with Transformers/snapshot/scored-pair provenance, returned it
+through the API, and rendered the real-execution fields without simulated markers. Idempotent
+replay reused the job, and lexical run metrics were unchanged. No live database was accessed.
+
 ## 2. Startup Instructions (3 Terminals)
 
 Prerequisites: Python 3.13 (`backend/.venv` initialized via `make setup`) and Node 22 (`frontend/node_modules` installed). Ports `127.0.0.1:8000` and `127.0.0.1:5173` must be free.
@@ -104,6 +216,10 @@ Open `http://127.0.0.1:5173` in your browser.
    - Per-citation decision table with component coverage scores.
 
 ### Step C — Run a Semantic Claim Assessment (`semantic-aggregate-v12` with Simulated Verifier)
+
+For the real worker variant above, the same controls run real CPU NLI. Look for **Real NLI inference**,
+**Executed model** and **Actual inference backend: transformers** instead of simulated disclosure.
+The following steps describe the original lightweight simulated workflow.
 1. On the same expanded result row (or another case that has recorded `retrieved_passage_ids`), click
    **Run claim assessment**.
 2. Observe the job lifecycle (`queued` → `running` → `succeeded`) and progress counter

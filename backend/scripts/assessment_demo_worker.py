@@ -1,7 +1,7 @@
 """Isolated local assessment demo worker and cleanup helper.
 
 Runs CitationAssessmentWorker (real frozen citation-evaluator-v4) and ClaimAssessmentWorker
-(with an explicitly labeled deterministic simulated verifier stub, no model weights loaded)
+(real pinned CPU NLI by default; explicitly select --verifier simulated for a model-free stub)
 against a dedicated demo SQLite database (default: backend/data/assessment_demo.db).
 Refuses to touch backend/data/evalops.db.
 """
@@ -21,6 +21,9 @@ from pathlib import Path
 from evalops.claim_assessments import config_digest
 from evalops.config import BACKEND_DIR
 from evalops.db import make_engine, make_session_factory, run_migrations
+from evalops.models import ClaimAssessmentJob
+from evalops.nli_runtime import check_local_nli, make_cpu_verifier
+from evalops.semantic.nli import SemanticBackendUnavailable
 from evalops.semantic.segments import evidence_units
 from evalops.semantic.verdict import (
     CONTRADICTED,
@@ -239,7 +242,21 @@ def clean_demo_database(db_path: Path) -> int:
     return 0
 
 
-def main() -> int:
+def _claim_exit_status(session_factory, claim_id: int | None) -> int:
+    if claim_id is None:
+        return 0
+    with session_factory() as session:
+        job = session.get(ClaimAssessmentJob, claim_id)
+        if job and job.status == "failed":
+            print(
+                f"Claim assessment #{claim_id} failed: {job.error_code}. No fallback.",
+                file=sys.stderr,
+            )
+            return 1
+    return 0
+
+
+def main(argv=None) -> int:
     default_url = os.environ.get("EVALOPS_DATABASE_URL", f"sqlite:///{DEFAULT_DEMO_DB_PATH}")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -268,7 +285,13 @@ def main() -> int:
         action="store_true",
         help="Delete the designated demo database and sidecars if no demo processes are active.",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--verifier",
+        choices=("real", "simulated"),
+        default="real",
+        help="Claim verifier: pinned CPU NLI (default), or explicit simulated model-free demo.",
+    )
+    args = parser.parse_args(argv)
 
     try:
         db_path = _resolve_sqlite_path(args.database_url)
@@ -278,6 +301,13 @@ def main() -> int:
 
     if args.clean_db:
         return clean_demo_database(db_path)
+
+    if args.verifier == "real":
+        try:
+            check_local_nli()
+        except (ImportError, OSError, SemanticBackendUnavailable) as exc:
+            print(f"Real NLI unavailable: {exc}. No simulated fallback.", file=sys.stderr)
+            return 2
 
     database_url = f"sqlite:///{db_path}"
     if args.migrate or not db_path.exists():
@@ -289,7 +319,9 @@ def main() -> int:
     citation_worker = CitationAssessmentWorker(session_factory)
     claim_worker = ClaimAssessmentWorker(
         session_factory,
-        verifier_factory=SimulatedDemoClaimVerifier,
+        verifier_factory=(
+            make_cpu_verifier if args.verifier == "real" else SimulatedDemoClaimVerifier
+        ),
     )
 
     if args.once:
@@ -299,7 +331,7 @@ def main() -> int:
             print(
                 f"assessment_demo_worker (--once): citation_job={citation_id} claim_job={claim_id}"
             )
-            return 0
+            return _claim_exit_status(session_factory, claim_id)
         finally:
             engine.dispose()
 
@@ -314,11 +346,16 @@ def main() -> int:
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
+    claim_description = (
+        "pinned Transformers NLI; CPU, lazy load"
+        if args.verifier == "real"
+        else "deterministic stub; no AI model loaded"
+    )
     print(
         f"EvalOps Assessment Demo Worker started.\n"
         f"  Database : {db_path} (isolated; {LIVE_DB_PATH.name} is untouched)\n"
         f"  Citation : real frozen citation-evaluator-v4\n"
-        f"  Claim    : SimulatedDemoClaimVerifier (deterministic stub; no AI model loaded)\n"
+        f"  Claim    : {args.verifier} ({claim_description})\n"
         f"Press Ctrl+C to stop."
     )
 
@@ -331,7 +368,9 @@ def main() -> int:
                 did_work = True
             claim_id = claim_worker.run_once()
             if claim_id is not None:
-                print(f"[claim-worker] processed assessment #{claim_id} (simulated demo verifier)")
+                print(f"[claim-worker] processed assessment #{claim_id} ({args.verifier} mode)")
+                if _claim_exit_status(session_factory, claim_id):
+                    return 1
                 did_work = True
             if not did_work:
                 time.sleep(max(0.05, args.poll_seconds))
